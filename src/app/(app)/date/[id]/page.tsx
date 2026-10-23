@@ -6,6 +6,7 @@ import { Bubble } from "@/components/bubble";
 import { candlesFrom, ChemistryChart, Ticker } from "@/components/chart";
 import { AiBadge, ChogFace, STAGE_LABEL, STAGE_ORDER, StageChip } from "@/components/chog";
 import { cx } from "@/components/primitives";
+import { GiftPanel } from "@/components/gift-panel";
 import { ErrorState, Skeleton, toast } from "@/components/states";
 import { api, ApiError, useMe } from "@/lib/client";
 import type { CoupleDetail, Me, Mode } from "@/lib/types";
@@ -116,6 +117,7 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
                 </h1>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <StageChip stage={c.stage} />
+                  {c.venue && <span className="chip bg-accent-soft">🕯️ Candlelit dinner</span>}
                   <span className="font-mono text-[11px] uppercase tracking-wider text-fg-mute">
                     Date #{c.session.index}
                     {inProgress && ` · line ${msgs.length}/${DATE_LENGTH}`}
@@ -167,6 +169,7 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
 
       <aside className="space-y-4">
         <Couple c={c} />
+        <GiftPanel coupleId={c.id} partnerName={c.partner.name} disabled={c.stage === "broken_up"} onGiven={() => q.refetch()} />
         <Unmask c={c} onDone={() => q.refetch()} />
       </aside>
     </div>

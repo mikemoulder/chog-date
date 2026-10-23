@@ -7,9 +7,17 @@ import type { FeedEvent } from "@/lib/types";
 
 export default function GossipPage() {
   const q = useQuery({ queryKey: ["gossip"], queryFn: () => api<FeedEvent[]>("/api/gossip"), refetchInterval: 20_000 });
+  const burned = useQuery({ queryKey: ["burned"], queryFn: () => api<{ burned: number }>("/api/burned"), refetchInterval: 60_000 });
   return (
     <div className="mx-auto max-w-[760px] px-[var(--gutter)] py-6">
-      <PageHead title="The Daily Chog" sub="Every finished date across the collection, written up by our gossip columnist." />
+      <PageHead title="The Daily Chog" sub="Every finished date across the collection, written up by our gossip columnist.">
+        {burned.data && (
+          <div className="sticker shrink-0 bg-accent px-3 py-2 text-right">
+            <div className="t-num text-[22px] leading-none">{burned.data.burned.toLocaleString()}</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider">$CHOG burned for love</div>
+          </div>
+        )}
+      </PageHead>
       {q.isLoading ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 w-full rounded-tile" />)}</div>
       ) : q.isError ? (

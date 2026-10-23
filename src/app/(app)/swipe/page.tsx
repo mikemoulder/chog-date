@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AiBadge, ChogFace } from "@/components/chog";
 import { cx } from "@/components/primitives";
 import { EmptyState, ErrorState, Skeleton, toast } from "@/components/states";
+import { useGift } from "@/components/use-gift";
+import { GIFTS } from "@/lib/gifts";
 import { api, useMe } from "@/lib/client";
 import type { DeckCard, Me, Profile } from "@/lib/types";
 
@@ -21,6 +23,7 @@ export default function SwipePage() {
   const [match, setMatch] = useState<{ partner: DeckCard; coupleId: string; decidedBy?: string } | null>(null);
   const [left, setLeft] = useState<number | null>(null);
   const busy = useRef(false);
+  const { give, busy: paying, walletReady } = useGift();
 
   const cards = deck.data ?? [];
   const card = cards[index];
@@ -47,6 +50,27 @@ export default function SwipePage() {
     },
     [card, qc],
   );
+
+  // Super-like: burn $CHOG first, then the server verifies it and swipes with it.
+  async function superLike() {
+    if (!card || busy.current) return;
+    busy.current = true;
+    try {
+      const res = await give<{ swipe: SwipeResult }>("superlike", { target: card.tokenId });
+      if (!res) return;
+      setLeaving("right");
+      await new Promise((r) => setTimeout(r, 220));
+      setLeft(res.swipe.swipesLeft);
+      if (res.swipe.matched && res.swipe.coupleId) {
+        setMatch({ partner: card, coupleId: res.swipe.coupleId, decidedBy: res.swipe.decidedBy });
+        qc.invalidateQueries({ queryKey: ["couples"] });
+      } else toast.success(`⭐ ${card.name}'s human will see your super-like first`);
+      setIndex((i) => i + 1);
+    } finally {
+      setLeaving(null);
+      busy.current = false;
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -90,9 +114,19 @@ export default function SwipePage() {
       ) : (
         <>
           <Card key={card.tokenId} card={card} leaving={leaving} />
-          <div className="sticky bottom-[72px] z-20 mt-4 grid grid-cols-2 gap-3 md:static md:mt-5">
+          <div className="sticky bottom-[72px] z-20 mt-4 grid grid-cols-[1fr_auto_1fr] gap-3 md:static md:mt-5">
             <button className="btn btn-quiet h-14 text-[16px]" onClick={() => decide(false)} disabled={!!leaving} aria-label={`Pass on ${card.name}`}>
               ✕ Pass
+            </button>
+            <button
+              className="btn btn-quiet h-14 !px-3 text-[14px]"
+              onClick={superLike}
+              disabled={!!leaving || paying !== null}
+              aria-busy={paying === "superlike"}
+              title={walletReady ? `${GIFTS.superlike.blurb} Burns ${GIFTS.superlike.price} $CHOG.` : "Connect the wallet you signed in with to super-like"}
+              aria-label={`Super-like ${card.name} for ${GIFTS.superlike.price} $CHOG`}
+            >
+              ⭐ <span className="font-mono text-[11px]">{GIFTS.superlike.price}</span>
             </button>
             <button className="btn btn-accent h-14 text-[16px]" onClick={() => decide(true)} disabled={!!leaving} aria-label={`Like ${card.name}`}>
               ♥ Like
@@ -117,7 +151,7 @@ function Card({ card, leaving }: { card: DeckCard; leaving: "left" | "right" | n
       <div className="relative">
         <ChogFace chog={card} size={520} className="!h-[44dvh] !w-full rounded-none border-0 border-b-2 object-top md:!h-auto md:max-h-none" />
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          {card.likesYou && <span className="chip bg-accent">Likes you</span>}
+          {card.superLikesYou ? <span className="chip bg-accent">⭐ Super-liked you</span> : card.likesYou && <span className="chip bg-accent">Likes you</span>}
           <AiBadge profile={card} />
         </div>
         <div className="absolute bottom-3 right-3 grid h-[72px] w-[72px] place-items-center rounded-chip border-2 border-line-strong bg-panel text-center shadow-card">

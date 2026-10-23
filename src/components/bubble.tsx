@@ -2,7 +2,19 @@ import { cx } from "./primitives";
 import { ChogFace } from "./chog";
 import type { Profile } from "@/lib/types";
 
-export function Bubble({ from, mine, body, delta, author }: { from: Pick<Profile, "tokenId" | "name" | "image">; mine: boolean; body: string; delta?: number; author?: "human" | "ai" }) {
+export function Bubble({ from, mine, body, delta, author }: { from: Pick<Profile, "tokenId" | "name" | "image">; mine: boolean; body: string; delta?: number; author?: "human" | "ai" | "gift" }) {
+  if (author === "gift") {
+    // A $CHOG gift: an event in the date, not a line of dialogue.
+    return (
+      <div className="flex justify-center" style={{ animation: "pop-in 220ms var(--motion-out) both" }}>
+        <div className="sticker inline-flex items-center gap-2 !rounded-chip bg-accent px-3 py-1.5 text-[13px] font-bold">
+          <ChogFace chog={from} size={22} className="!rounded-chip !border" />
+          <span>{mine ? "You" : from.name} {body}</span>
+          {delta ? <span className="font-mono text-[11px]">+{Math.round(delta)}</span> : null}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={cx("flex items-end gap-2", mine && "flex-row-reverse")} style={{ animation: "bubble-in 200ms var(--motion-out) both" }}>
       <ChogFace chog={from} size={34} />
