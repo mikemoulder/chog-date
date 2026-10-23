@@ -17,8 +17,13 @@ const TABS = [
 // The logo: chog ❤️ date.
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1 font-semibold tracking-[-0.02em]", className)} aria-label="Chog Date">
-      chog<span aria-hidden className="text-[0.9em]">❤️</span>date
+    <span className={cx("inline-flex items-center gap-[0.12em] font-semibold tracking-[-0.02em]", className)} aria-label="Chog Date">
+      chog
+      {/* the heart badge: a pink pill, ink outline, ink heart */}
+      <span aria-hidden className="mx-[0.06em] inline-flex h-[1.3em] w-[1.85em] translate-y-[0.04em] items-center justify-center rounded-full border-[0.11em] border-[#110e14] bg-[#ff3d8b] text-[0.95em] leading-none text-[#110e14]">
+        ♥
+      </span>
+      date
     </span>
   );
 }
