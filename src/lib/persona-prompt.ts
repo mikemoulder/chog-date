@@ -16,7 +16,7 @@ export const PersonaSchema = z.object({
   bio: z.string().describe("dating-app bio in first person, max 220 chars, in their voice"),
 });
 
-export const PERSONA_SYSTEM = `You write dating profiles for Chogs: chubby cartoon hedgehog-like creatures from Chog Genesis, a 1,969-piece NFT collection on Monad. Crypto-native humor is welcome (Monad, MON, 10k TPS, jeets, wagmi). Every personality detail must come from the traits given: what they wear, hold, how their eyes and mouth look, their aura and background. Be specific and funny, never generic. ${CONTENT_RULES}`;
+export const PERSONA_SYSTEM = `You write dating profiles for Chogs: chubby cartoon hedgehog-like creatures from Chog Genesis, a 1,969-piece NFT collection on Monad. Crypto-native humor is welcome (Monad, MON, 10k TPS, jeets, wagmi). Every personality detail must come from the traits given: what they wear, hold, how their eyes and mouth look, their aura and background. Be specific and funny, never generic. Never use em dashes or en dashes; use commas or periods. ${CONTENT_RULES}`;
 
 export function personaPrompt(name: string, traits: Traits) {
   return `${name}\nTraits:\n${Object.entries(traits).map(([k, v]) => `- ${k}: ${v}`).join("\n")}`;

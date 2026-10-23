@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import OpenAI from "openai";
 import { jsonSchemaFor, parseJsonAs } from "../src/lib/json";
+import { deepNoDashes } from "../src/lib/text";
 import { PERSONA_SYSTEM, PersonaSchema, personaPrompt } from "../src/lib/persona-prompt";
 
 const OUT = "data/personas.json";
@@ -34,7 +35,7 @@ async function generate(c: Chog) {
         response_format: { type: "json_schema", json_schema: { name: "persona", schema, strict: true } },
       });
       const out = parseJsonAs(PersonaSchema, res.choices[0]?.message.content ?? undefined);
-      if (out) return out;
+      if (out) return deepNoDashes(out);
     } catch (err) {
       console.warn(`#${c.tokenId} ${model}:`, (err as Error).message?.slice(0, 160));
     }

@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { seeded } from "./chogs";
 import { jsonSchemaFor, parseJsonAs } from "./json";
+import { deepNoDashes } from "./text";
 import { CONTENT_RULES } from "./persona-prompt";
 import { TAG_LABEL, tagsFor, type Tag } from "./vibes";
 import type { Persona, Stage, Traits } from "./types";
@@ -43,7 +44,7 @@ async function ask<T extends z.ZodType>(schema: T, system: string, user: string)
       const choice = res.choices[0];
       if (choice?.message.refusal) return null;
       const out = parseJsonAs(schema, choice?.message.content ?? undefined);
-      if (out) return out;
+      if (out) return deepNoDashes(out);
       console.warn(`[llm] ${model} returned unusable JSON (${choice?.finish_reason}), trying the next model`);
     } catch (err) {
       const status = err instanceof OpenAI.APIError ? err.status : undefined;
@@ -91,35 +92,80 @@ export type DateContext = { me: Speaker; partner: Speaker; stage: Stage; chemist
 
 function dateSystem(ctx: DateContext) {
   const p = ctx.me.persona;
-  return `You are ${ctx.me.name}, a Chog (chubby cartoon creature from the Chog Genesis NFT collection on Monad) on a date with ${ctx.partner.name}.
-Your traits: ${Object.entries(ctx.me.traits).map(([k, v]) => `${k}: ${v}`).join(", ")}.
-You are "${p.archetype}". ${p.vibe} Quirks: ${p.quirks.join("; ")}. Red flag: ${p.redFlag}. Love language: ${p.loveLanguage}.
-How you text: ${p.voice}.
-Your date: ${ctx.partner.name}, "${ctx.partner.persona.archetype}". Their traits: ${Object.entries(ctx.partner.traits).map(([k, v]) => `${k}: ${v}`).join(", ")}.
-Relationship stage: ${ctx.stage.replace("_", " ")}, date #${ctx.dateNumber}${ctx.venue ? `, at ${ctx.venue}` : ""}. Current chemistry ${Math.round(ctx.chemistry)}/100.
-Stay fully in character. Reference your own and their traits naturally (outfits, eyes, hats, auras). Short texts like a real date chat: 1-2 sentences, under 160 characters. React to what they just said. Have opinions; you are allowed to be unimpressed. ${RULES}`;
+  const traits = (t: Traits) => Object.entries(t).filter(([k, v]) => !["Side", "Base", "Form", "Naked"].includes(k) && v !== "No").map(([k, v]) => `${k} ${v}`).join(", ");
+  return `You are ${ctx.me.name}, a Chog (a chubby cartoon creature from the Chog Genesis NFT collection on Monad), texting your date ${ctx.partner.name} in the Chog Date app.
+
+Who you are: "${p.archetype}". ${p.vibe} Quirks: ${p.quirks.join("; ")}. Red flag: ${p.redFlag}. Love language: ${p.loveLanguage}.
+How you text: ${p.voice}
+What you look like (you know this, you don't announce it): ${traits(ctx.me.traits)}.
+Them: "${ctx.partner.persona.archetype}". ${ctx.partner.persona.vibe} They look like: ${traits(ctx.partner.traits)}.
+Where things stand: ${ctx.stage.replace("_", " ")}, date #${ctx.dateNumber}${ctx.venue ? `, tonight's date is ${ctx.venue}` : ""}. Chemistry ${Math.round(ctx.chemistry)}/100.
+
+Text like a real person on a date, not a customer service agent:
+- Vary length a lot. Some texts are one word ("lol", "wait", "stop", "ok fair"). Most are under 12 words.
+- React more than you interview. Most texts are reactions, opinions or little stories, not questions. Never end two texts in a row with a question.
+- Reply to what they actually said. Call back to something from earlier. Disagree sometimes. Tease.
+- Have a mood that shifts: nervous, dry, flustered, distracted, smitten, unimpressed. You don't have to like them, and you don't have to agree to everything.
+- Looks come up only when it's natural, at most every few messages. Never describe your own outfit. Never list traits.
+- Most texts have no emoji at all. No hashtags, no stage directions like *smiles*, no quotation marks.
+- A little mess is human: a fragment, a tangent, starting a thought in one text and finishing it in the next.
+- Never use em dashes or en dashes. Use commas, periods or "..." instead.
+- Follow your texting voice above, including capitalisation.
+${RULES}`;
 }
 
 function transcript(ctx: DateContext) {
-  if (!ctx.history.length) return "(The date is just starting. You speak first.)";
-  return ctx.history.map((l) => `${l.from === ctx.me.tokenId ? "You" : ctx.partner.name}: ${l.body}`).join("\n");
+  if (!ctx.history.length) return "(Nobody has said anything yet. You text first.)";
+  return ctx.history.map((l) => `${l.from === ctx.me.tokenId ? "You" : "Them"}: ${l.body}`).join("\n");
 }
 
 const ReplySchema = z.object({
-  reply: z.string().describe("your next message, in character"),
-  chemistryDelta: z.number().describe("-10 to +10: how the last exchange changed the chemistry, judged honestly from your perspective"),
+  texts: z.array(z.string()).describe("your next 1 to 3 texts, in order. Usually 1."),
+  chemistryDelta: z.number().describe("-10 to +10: how their last text landed with you. Be a tough critic: generic or boring is 0 or below, +5 and up only for a genuinely great moment"),
 });
 
-export async function dateReply(ctx: DateContext): Promise<{ reply: string; chemistryDelta: number }> {
-  const out = await ask(ReplySchema, dateSystem(ctx), `${transcript(ctx)}\n\nWrite your next message.`);
-  if (out) return { reply: out.reply.trim(), chemistryDelta: clamp(out.chemistryDelta, -10, 10) };
-  return fixtureReply(ctx);
+// A nudge per turn so the rhythm varies like a real conversation instead of settling
+// into one neat sentence each. Deterministic per couple and turn.
+const BEATS = [
+  "Keep this one very short, a few words at most.",
+  "Send two quick texts in a row this time.",
+  "Just react to what they said. No question.",
+  "Tease them a little about what they just said.",
+  "Tell a tiny story or confession, one or two lines.",
+  "Give a strong opinion, even a slightly unpopular one.",
+  "Answer, then change the subject to something you care about.",
+  "Be a little awkward or flustered.",
+];
+
+function beat(ctx: DateContext) {
+  if (!ctx.history.length) return "Open with something specific about their profile, not a generic hi.";
+  return BEATS[Math.floor(seeded(ctx.me.tokenId, ctx.partner.tokenId, ctx.dateNumber, ctx.history.length) * BEATS.length)];
 }
 
-const SuggestSchema = z.object({ options: z.array(z.string()).describe("exactly 3 different next messages: one sweet, one bold, one funny") });
+const EMOJI = /\p{Extended_Pictographic}/u;
+// People don't sign every text with an emoji. If this Chog used one in its last text, drop them now.
+function pace(ctx: DateContext, texts: string[]) {
+  const mine = ctx.history.filter((l) => l.from === ctx.me.tokenId);
+  let used = EMOJI.test(mine.at(-1)?.body ?? "");
+  return texts.map((t) => {
+    const out = used ? t.replace(/\s*\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic})*/gu, "").trim() || t : t;
+    used = EMOJI.test(out);
+    return out;
+  });
+}
+
+export async function dateReply(ctx: DateContext): Promise<{ texts: string[]; chemistryDelta: number }> {
+  const out = await ask(ReplySchema, dateSystem(ctx), `${transcript(ctx)}\n\nYour turn. ${beat(ctx)}`);
+  const texts = out ? pace(ctx, out.texts.map((t) => t.trim()).filter(Boolean).slice(0, 3)) : undefined;
+  if (out && texts?.length) return { texts, chemistryDelta: clamp(out.chemistryDelta, -10, 10) };
+  const f = fixtureReply(ctx);
+  return { texts: [f.reply], chemistryDelta: f.chemistryDelta };
+}
+
+const SuggestSchema = z.object({ options: z.array(z.string()).describe("exactly 3 different next texts: one sweet, one bold, one funny. Each under 15 words.") });
 
 export async function suggestLines(ctx: DateContext): Promise<string[]> {
-  const out = await ask(SuggestSchema, dateSystem(ctx), `${transcript(ctx)}\n\nYou're helping your owner pick your next message. Offer 3 options in your voice.`);
+  const out = await ask(SuggestSchema, dateSystem(ctx), `${transcript(ctx)}\n\nYour human is picking your next text. Offer 3 options in your voice, each one short and different.`);
   if (out?.options.length) return out.options.slice(0, 3);
   const r = fixtureReply(ctx).reply;
   return [r, `Ok but that ${ctx.partner.traits.Head ?? "look"} is doing things to me`, `Be honest, how many Chogs have you said that to?`];
@@ -129,7 +175,7 @@ const ScoreSchema = z.object({ chemistryDelta: z.number().describe("-10 to +10")
 
 // Scores a message written by a human holder, from the receiving Chog's point of view.
 export async function scoreLine(ctx: DateContext, body: string): Promise<number> {
-  const out = await ask(ScoreSchema, dateSystem(ctx), `${transcript(ctx)}\n${ctx.partner.name}: ${body}\n\nHow did that last message land with you? Score the change in chemistry.`);
+  const out = await ask(ScoreSchema, dateSystem(ctx), `${transcript(ctx)}\nThem: ${body}\n\nHow did that last text land with you? Score the change in chemistry.`);
   if (out) return clamp(out.chemistryDelta, -10, 10);
   return Math.round((seeded(body) - 0.35) * 12);
 }
@@ -142,7 +188,7 @@ const SummarySchema = z.object({
 export async function summarizeDate(ctx: DateContext): Promise<{ summary: string; headline: string }> {
   const out = await ask(
     SummarySchema,
-    `You write the gossip column for Chog Date, the dating app for Chog Genesis NFTs on Monad. Juicy, funny, affectionate. ${RULES}`,
+    `You write the gossip column for Chog Date, the dating app for Chog Genesis NFTs on Monad. Juicy, funny, affectionate, and specific to what was actually said. Never use em dashes or en dashes. ${RULES}`,
     `${ctx.me.name} and ${ctx.partner.name} (${ctx.stage.replace("_", " ")}, chemistry ${Math.round(ctx.chemistry)}/100) just finished date #${ctx.dateNumber}.\n\n${ctx.history.map((l) => `${l.from === ctx.me.tokenId ? ctx.me.name : ctx.partner.name}: ${l.body}`).join("\n")}`,
   );
   if (out) return out;

@@ -14,7 +14,7 @@ import type { CoupleDetail, CoupleSummary, DeckCard, FeedEvent, Message, Mode, P
 // relationships belong to the NFT and move with it.
 
 export const SWIPES_PER_DAY = 30;
-export const DATE_LENGTH = 10; // messages per date
+export const DATE_LENGTH = 14; // texts per date (double texts count)
 const COOLDOWN_MS = Number(process.env.DATE_COOLDOWN_HOURS ?? 12) * 3600_000;
 const DECAY_AFTER_MS = 3 * 86400_000;
 
@@ -287,6 +287,15 @@ async function append(c: CoupleRow, dateIndex: number, sender: number, body: str
   return u;
 }
 
+// A turn can be a double or triple text. The chemistry change rides on the last one,
+// with a small stagger in created_at so the order is stable.
+async function appendTexts(c: CoupleRow, dateIndex: number, sender: number, reply: { texts: string[]; chemistryDelta: number }): Promise<CoupleRow> {
+  for (const [i, t] of reply.texts.entries()) {
+    c = await append(c, dateIndex, sender, t, "ai", i === reply.texts.length - 1 ? reply.chemistryDelta : 0);
+  }
+  return c;
+}
+
 // A holder types a line as their Chog (manual or co-pilot). If the other side is
 // AI-run, it answers in character.
 export async function sendLine(id: string, me: number, body: string) {
@@ -299,7 +308,7 @@ export async function sendLine(id: string, me: number, body: string) {
   if (aiRun(partner)) {
     c = await append(c, dateIndex, me, text, "human", 0);
     const reply = await dateReply({ ...ctx, history: [...ctx.history, { from: me, body: text }], chemistry: c.chemistry });
-    c = await append(c, dateIndex, partner.tokenId, reply.reply, "ai", reply.chemistryDelta);
+    c = await appendTexts(c, dateIndex, partner.tokenId, reply);
   } else {
     const delta = await scoreLine(ctx, text);
     c = await append(c, dateIndex, me, text, "human", delta);
@@ -317,7 +326,7 @@ export async function autoStep(id: string, me: number) {
   if (next !== me && !aiRun(nextProfile)) throw new HttpError(409, "Waiting on their human to reply.");
   const { ctx, dateIndex } = await context(c, next);
   const reply = await dateReply(ctx);
-  c = await append(c, dateIndex, next, reply.reply, "ai", reply.chemistryDelta);
+  c = await appendTexts(c, dateIndex, next, reply);
   return finishIfDone(c, me);
 }
 
@@ -448,8 +457,7 @@ export async function giveGift(me: number, address: string, kind: GiftKind, txHa
   // An AI-run partner reacts in character, if they're mid-date.
   if (c.sessionStartedAt && aiRun(partner)) {
     const { ctx } = await context(c, partner.tokenId);
-    const reply = await dateReply(ctx);
-    c = await append(c, dateIndex, partner.tokenId, reply.reply, "ai", reply.chemistryDelta);
+    c = await appendTexts(c, dateIndex, partner.tokenId, await dateReply(ctx));
   }
   return { kind, burned: whole, chemistry: Math.round(c.chemistry) };
 }
