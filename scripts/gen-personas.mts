@@ -10,7 +10,7 @@ import { deepNoDashes } from "../src/lib/text";
 import { PERSONA_SYSTEM, PersonaSchema, personaPrompt } from "../src/lib/persona-prompt";
 
 const OUT = "data/personas.json";
-const MODELS = (process.env.OPENAI_MODELS ?? "gpt-6-luna,gpt-5-nano").split(",").map((m) => m.trim());
+const MODELS = (process.env.OPENAI_MODELS || "gpt-6-luna,gpt-5-nano").split(",").map((m) => m.trim());
 const WORKERS = Number(process.env.WORKERS ?? 8);
 
 if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set (use --env-file=.env.local)");

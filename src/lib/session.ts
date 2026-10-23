@@ -11,7 +11,7 @@ export type SessionData = {
 };
 
 function options(): SessionOptions {
-  const secret = process.env.SESSION_SECRET ?? (process.env.NODE_ENV === "production" ? undefined : "dev-only-secret-chog-date-0123456789abcdef");
+  const secret = process.env.SESSION_SECRET || (process.env.NODE_ENV === "production" ? undefined : "dev-only-secret-chog-date-0123456789abcdef");
   if (!secret) throw new Error("SESSION_SECRET is required in production");
   return {
     cookieName: "chogdate",

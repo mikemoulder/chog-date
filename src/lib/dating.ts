@@ -16,7 +16,7 @@ import type { CoupleDetail, CoupleSummary, DeckCard, FeedEvent, Message, Mode, P
 
 export const SWIPES_PER_DAY = 30;
 export const DATE_LENGTH = 14; // texts per date (double texts count)
-const COOLDOWN_MS = Number(process.env.DATE_COOLDOWN_HOURS ?? 12) * 3600_000;
+const COOLDOWN_MS = Number(process.env.DATE_COOLDOWN_HOURS || 12) * 3600_000;
 const DECAY_AFTER_MS = 3 * 86400_000;
 
 type CoupleRow = typeof schema.couples.$inferSelect;

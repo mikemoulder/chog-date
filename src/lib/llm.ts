@@ -12,12 +12,13 @@ import type { Persona, Stage, Traits } from "./types";
 // rate limit, overload or timeout) and has a deterministic fixture behind it, used when
 // there is no key, when LLM_FIXTURES=1, or when every model fails. The demo never stalls.
 
-export const MODELS = (process.env.OPENAI_MODELS ?? "gpt-6-luna,gpt-5-nano").split(",").map((m) => m.trim()).filter(Boolean);
+export const MODELS = (process.env.OPENAI_MODELS || "gpt-6-luna,gpt-5-nano").split(",").map((m) => m.trim()).filter(Boolean);
 // Banter needs speed, not deliberation. Original gpt-5 models bottom out at "minimal";
 // newer ones accept "none". OPENAI_REASONING overrides ("" omits the parameter).
 const effortFor = (model: string): OpenAI.ReasoningEffort | undefined => {
   const env = process.env.OPENAI_REASONING;
-  if (env !== undefined) return (env || undefined) as OpenAI.ReasoningEffort | undefined;
+  if (env === "off") return undefined;
+  if (env) return env as OpenAI.ReasoningEffort;
   return /^gpt-5(-mini|-nano)?$/.test(model) ? "minimal" : "none";
 };
 const live = !!process.env.OPENAI_API_KEY && process.env.LLM_FIXTURES !== "1";

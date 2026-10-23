@@ -17,7 +17,7 @@ const abi = parseAbi([
 
 export const client = createPublicClient({
   chain: monad,
-  transport: http(process.env.MONAD_RPC_URL ?? "https://rpc.monad.xyz", { timeout: 8000, retryCount: 1 }),
+  transport: http(process.env.MONAD_RPC_URL || "https://rpc.monad.xyz", { timeout: 8000, retryCount: 1 }),
 });
 
 const TTL = 60_000;
