@@ -1,0 +1,7 @@
+.cache
+.pglite
+.design
+.env*.local
+.env
+node_modules
+.next
