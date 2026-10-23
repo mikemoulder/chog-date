@@ -5,7 +5,7 @@ import { compatibility } from "./compat";
 import { getDb, schema } from "./db";
 import { dateReply, scoreLine, suggestLines, summarizeDate, type DateContext, type Speaker } from "./llm";
 import { aiRun, getProfile, getProfiles } from "./profiles";
-import { verifyChogBurn } from "./chain";
+import { ownerOf, tokensOf, verifyChogBurn } from "./chain";
 import { DINNER_VENUE, GIFTS, type GiftKind } from "./gifts";
 import { HttpError } from "./http";
 import type { CoupleDetail, CoupleSummary, DeckCard, FeedEvent, Message, Mode, Profile, Stage } from "./types";
@@ -79,7 +79,9 @@ export async function deck(me: number, limit = 12): Promise<DeckCard[]> {
   const db = await getDb();
   const swiped = await db.select({ to: schema.swipes.toToken }).from(schema.swipes).where(eq(schema.swipes.fromToken, me));
   const coupled = await db.select().from(schema.couples).where(or(eq(schema.couples.aToken, me), eq(schema.couples.bToken, me)));
-  const exclude = new Set([me, ...swiped.map((s) => s.to), ...coupled.map((c) => partnerOf(c, me))]);
+  // Never your own Chogs: everything this Chog's holder owns is out of the deck.
+  const siblings = await tokensOf(await ownerOf(me));
+  const exclude = new Set([me, ...siblings, ...swiped.map((s) => s.to), ...coupled.map((c) => partnerOf(c, me))]);
 
   // Chogs that already liked me, and Chogs with a human at the wheel, go first.
   const admirers = new Set(
@@ -88,16 +90,29 @@ export async function deck(me: number, limit = 12): Promise<DeckCard[]> {
   const superAdmirers = new Set(
     (await db.select({ from: schema.gifts.fromToken }).from(schema.gifts).where(and(eq(schema.gifts.toToken, me), eq(schema.gifts.kind, "superlike")))).map((r) => r.from),
   );
-  const claimed = new Set(
-    (await db.select({ id: schema.chogState.tokenId }).from(schema.chogState).where(sql`${schema.chogState.claimedBy} is not null`)).map((r) => r.id),
+  const humans = new Map(
+    (await db.select({ id: schema.chogState.tokenId, mode: schema.chogState.mode, seen: schema.chogState.lastSeenAt }).from(schema.chogState)
+      .where(sql`${schema.chogState.claimedBy} is not null`)).map((r) => [r.id, r]),
   );
 
+  // Strict tiers, then compatibility within each: super-liked you, liked you, Chogs with a
+  // human at the wheel, then AI-run Chogs. A real person always beats a better AI match.
   const day = new Date().toISOString().slice(0, 10);
+  const now = Date.now();
   const ranked = allChogs()
     .filter((c) => !exclude.has(c.tokenId))
     .map((c) => {
       const compat = compatibility(me, c.tokenId);
-      const rank = compat.score + (superAdmirers.has(c.tokenId) ? 200 : 0) + (admirers.has(c.tokenId) ? 60 : 0) + (claimed.has(c.tokenId) ? 20 : 0) + seeded(me, c.tokenId, day) * 45;
+      const human = humans.get(c.tokenId);
+      let rank = compat.score;
+      if (superAdmirers.has(c.tokenId)) rank += 4000;
+      else if (admirers.has(c.tokenId)) rank += 3000;
+      else if (human) {
+        rank += 2000;
+        if (human.mode !== "autopilot") rank += 100; // typing their own lines
+        const hoursAway = human.seen ? (now - human.seen.getTime()) / 3600_000 : Infinity;
+        rank += hoursAway < 24 ? 50 : hoursAway < 24 * 7 ? 25 : 0; // recently around
+      } else rank += seeded(me, c.tokenId, day) * 45; // AI-run: shuffle a little each day
       return { id: c.tokenId, compat, rank };
     })
     .sort((a, b) => b.rank - a.rank)
