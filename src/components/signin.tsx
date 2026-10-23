@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useAccount, useConnect, useSignMessage } from "wagmi";
 import { api } from "@/lib/client";
 import { signInMessage } from "@/lib/signin";
-import { toast } from "./states";
+import { toast } from "./ui";
 
 // Connect → sign a nonce → the server checks the signature and asks the contract
 // which Chogs this wallet holds. No Chog, no entry.
@@ -41,7 +41,7 @@ export function SignInButton({ className = "" }: { className?: string }) {
   }
 
   return (
-    <button className={`btn btn-accent btn-lg ${className}`} onClick={go} aria-busy={busy}>
+    <button className={className || "btn btn-primary btn-lg"} onClick={go} aria-busy={busy}>
       Connect wallet
     </button>
   );

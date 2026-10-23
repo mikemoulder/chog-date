@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { getChog, imageFor } from "./chogs";
 import { getDb, schema } from "./db";
 import { fixturePersona } from "./llm";
+import { deepNoEmoji, noEmoji } from "./text";
 import type { Mode, Persona, Profile } from "./types";
 
 // A Chog's dating profile: traits from the snapshot, persona + bio written once from
@@ -40,6 +41,9 @@ export async function getProfiles(tokenIds: number[]): Promise<Map<number, Profi
       const pre = pregenerated(id);
       let persona = pre?.persona ?? (row?.persona as Persona | null) ?? null;
       let bio = pre?.bio ?? row?.bio ?? null;
+      // Profiles are interface text: no emoji there (texts on a date keep theirs).
+      if (persona) persona = deepNoEmoji(persona);
+      if (bio) bio = noEmoji(bio);
       if (!persona || !bio) {
         // Never spend live quota on profiles: pre-generated, or the trait-based fixture.
         const generated = pregenerated(id) ?? fixturePersona(chog.name, chog.traits);

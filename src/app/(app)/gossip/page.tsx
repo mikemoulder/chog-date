@@ -1,56 +1,56 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { PageHead } from "@/components/shell";
-import { EmptyState, ErrorState, Skeleton } from "@/components/states";
+import { TitleRow } from "@/components/shell";
+import { Empty, Failed, Skeleton } from "@/components/ui";
 import { api } from "@/lib/client";
 import type { FeedEvent } from "@/lib/types";
 
+// The Daily Chog. The question: what happened on dates across the collection?
 export default function GossipPage() {
   const q = useQuery({ queryKey: ["gossip"], queryFn: () => api<FeedEvent[]>("/api/gossip"), refetchInterval: 20_000 });
   const burned = useQuery({ queryKey: ["burned"], queryFn: () => api<{ burned: number }>("/api/burned"), refetchInterval: 60_000 });
   return (
-    <div className="mx-auto max-w-[760px] px-[var(--gutter)] py-6">
-      <PageHead title="The Daily Chog" sub="Every finished date across the collection, written up by our gossip columnist.">
-        {burned.data && (
-          <div className="sticker shrink-0 bg-accent px-3 py-2 text-right">
-            <div className="t-num text-[22px] leading-none">{burned.data.burned.toLocaleString()}</div>
-            <div className="font-mono text-[10px] uppercase tracking-wider">$CHOG burned for love</div>
-          </div>
-        )}
-      </PageHead>
-      {q.isLoading ? (
-        <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 w-full rounded-tile" />)}</div>
-      ) : q.isError ? (
-        <ErrorState onRetry={() => q.refetch()} />
-      ) : !q.data?.length ? (
-        <EmptyState title="Slow news day" body="No dates have finished yet. Go on one and you'll make the front page." />
-      ) : (
-        <ol className="divide-y-2 divide-line-strong border-y-2 border-line-strong">
-          {q.data.map((e, i) => {
-            const [headline, ...rest] = e.text.split(": ");
-            return (
-              <li key={e.id} className="grid grid-cols-[auto_1fr] gap-4 py-5">
-                <span className="t-num w-10 text-[28px] leading-none text-fg-faint">{String(i + 1).padStart(2, "0")}</span>
-                <article>
-                  <div className="flex items-center gap-2">
+    <div className="grid gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_384px]">
+      <div>
+        <TitleRow title="Gossip" sub="The Daily Chog: every finished date in the collection, written up." />
+        {q.isLoading ? (
+          <div className="space-y-6">{[0, 1, 2].map((i) => <div key={i} className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-6 w-3/4" /><Skeleton className="h-4 w-full" /></div>)}</div>
+        ) : q.isError ? (
+          <Failed what="the gossip" onRetry={() => q.refetch()} />
+        ) : !q.data?.length ? (
+          <Empty>Slow news day. No dates have finished yet, so the first one makes the front page.</Empty>
+        ) : (
+          <ol>
+            {q.data.map((e) => {
+              const [headline, ...rest] = e.text.split(": ");
+              return (
+                <li key={e.id} className="grid grid-cols-[64px_minmax(0,1fr)] gap-4 border-t border-rule py-5 first:border-t-0 first:pt-0">
+                  <div className="relative h-12 w-16">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/chogs/${e.tokenId}.webp`} alt="" className="h-8 w-8 rounded-[8px] border-2 border-line-strong" />
+                    <img src={`/chogs/${e.tokenId}.webp`} alt="" className="absolute left-0 top-0 h-11 w-11 rounded-full bg-raised object-cover" />
                     {e.otherTokenId && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={`/chogs/${e.otherTokenId}.webp`} alt="" className="-ml-3 h-8 w-8 rounded-[8px] border-2 border-line-strong" />
+                      <img src={`/chogs/${e.otherTokenId}.webp`} alt="" className="absolute left-5 top-1 h-11 w-11 rounded-full bg-raised object-cover ring-2 ring-ground" />
                     )}
-                    <span className="t-label">
-                      #{e.tokenId} × #{e.otherTokenId} · {new Date(e.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                    </span>
                   </div>
-                  <h2 className="mt-2 text-[22px] font-extrabold leading-tight tracking-[-0.02em]">{headline}</h2>
-                  {rest.length > 0 && <p className="mt-1 text-[15px] text-fg-soft">{rest.join(": ")}</p>}
-                </article>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+                  <article>
+                    <h2 className="text-[18px] font-semibold leading-[24px]">{headline}</h2>
+                    {rest.length > 0 && <p className="mt-1 text-[14px] leading-[21px] text-muted">{rest.join(": ")}</p>}
+                    <p className="num mt-2 text-[12px] text-faint">{new Date(e.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                  </article>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+      <aside className="lg:pt-[86px]">
+        <section className="rounded-card bg-surface p-5" aria-labelledby="burned">
+          <h2 id="burned" className="text-[14px] text-muted">$CHOG burned for love</h2>
+          <p className="num mt-1 text-[32px] font-semibold leading-none text-accent">{burned.data ? burned.data.burned.toLocaleString() : "-"}</p>
+          <p className="mt-3 text-[13px] text-faint">Every rose, dinner and super-like is burned to the dead address, so nobody pockets it.</p>
+        </section>
+      </aside>
     </div>
   );
 }

@@ -1,9 +1,9 @@
-import { cx } from "./primitives";
+import { cx } from "./ui";
 
-// The signature: the date trades like a token. Every line prints a candle,
-// green when it landed, red when it flopped.
+// The signature: a date trades like a token. Every text prints a candle. One hue only:
+// a text that landed is a filled orange candle, one that flopped is a hollow one.
 
-export type Candle = { open: number; close: number; label?: string };
+export type Candle = { open: number; close: number };
 
 export function candlesFrom(start: number, deltas: number[]): Candle[] {
   let level = start;
@@ -22,48 +22,47 @@ export function ChemistryChart({ candles, height = 72, slots = 10, className }: 
   const y = (v: number) => height - ((v - lo) / span) * height;
   const w = 100 / slots;
   return (
-    <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" className={cx("block w-full", className)} style={{ height }} role="img" aria-label="Chemistry over this date">
-      {[0.25, 0.5, 0.75].map((f) => (
-        <line key={f} x1="0" x2="100" y1={height * f} y2={height * f} stroke="var(--line)" strokeWidth="0.6" vectorEffect="non-scaling-stroke" strokeDasharray="2 3" />
+    <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" className={cx("block w-full", className)} style={{ height }} role="img" aria-label="Chemistry over this date, one candle per text">
+      {[0.33, 0.66].map((f) => (
+        <line key={f} x1="0" x2="100" y1={height * f} y2={height * f} stroke="var(--grid)" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
       ))}
       {candles.slice(-slots).map((c, i) => {
         const up = c.close >= c.open;
         const top = y(Math.max(c.open, c.close));
-        const h = Math.max(4, Math.abs(y(c.open) - y(c.close)));
-        const x = i * w + w * 0.2;
+        const h = Math.max(3, Math.abs(y(c.open) - y(c.close)));
+        const x = i * w + w * 0.25;
         return (
-          <g key={i}>
-            <line x1={x + w * 0.3} x2={x + w * 0.3} y1={top - 3} y2={top + h + 3} stroke="var(--line-strong)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-            <rect
-              x={x}
-              y={top}
-              width={w * 0.6}
-              height={h}
-              rx="0.8"
-              fill={up ? "var(--success)" : "var(--danger)"}
-              stroke="var(--line-strong)"
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-              style={{ transformOrigin: `${x}px ${up ? top + h : top}px`, transformBox: "view-box", animation: "candle-grow 160ms var(--motion-out) both" }}
-            />
-          </g>
+          <rect
+            key={i}
+            x={x}
+            y={top}
+            width={w * 0.5}
+            height={h}
+            rx="0.6"
+            fill={up ? "var(--accent)" : "transparent"}
+            stroke={up ? "var(--accent)" : "var(--faint)"}
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+            style={{ transformOrigin: `${x}px ${up ? top + h : top}px`, transformBox: "view-box", animation: "candle-grow 180ms var(--ease) both" }}
+          />
         );
       })}
     </svg>
   );
 }
 
+// Chemistry as a figure. The change says good or bad: a text that landed is positive.
 export function Ticker({ value, delta, className }: { value: number; delta?: number; className?: string }) {
-  const up = (delta ?? 0) >= 0;
   return (
-    <div className={cx("flex items-baseline gap-2 font-mono", className)}>
-      <span className="t-label !text-fg-mute">Chem</span>
-      <span className="t-num text-[28px] leading-none">{Math.round(value)}</span>
-      {delta !== undefined && delta !== 0 && (
-        <span className={cx("text-[13px] font-semibold", up ? "text-success" : "text-danger")}>
-          {up ? "▲" : "▼"} {Math.abs(Math.round(delta))}
-        </span>
-      )}
+    <div className={cx("text-right", className)}>
+      <div className="num text-[24px] font-semibold leading-none">
+        {Math.round(value)}
+        <span className="text-[14px] font-normal text-faint"> /100</span>
+      </div>
+      <div className="mt-1 text-[12px] text-muted">
+        Chemistry
+        {delta ? <span className={cx("num ml-1.5", delta > 0 ? "text-positive" : "text-negative")}>{delta > 0 ? `+${Math.round(delta)}` : Math.round(delta)}</span> : null}
+      </div>
     </div>
   );
 }

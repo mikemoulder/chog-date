@@ -7,7 +7,7 @@ import { waitForTransactionReceipt } from "wagmi/actions";
 import { monad } from "wagmi/chains";
 import { api, useMe } from "@/lib/client";
 import { BURN_ADDRESS, CHOG_DECIMALS, CHOG_TOKEN, erc20TransferAbi, GIFTS, type GiftKind } from "@/lib/gifts";
-import { toast } from "./states";
+import { toast } from "./ui";
 
 // Burn $CHOG from the signed-in wallet, wait for Monad to confirm, then hand the tx hash
 // to the server, which verifies the burn on-chain before applying the gift.
@@ -55,7 +55,7 @@ export function useGift() {
         args: [BURN_ADDRESS, parseUnits(String(gift.price), CHOG_DECIMALS)],
         chainId: monad.id,
       });
-      toast(`${gift.icon} Burning ${gift.price} $CHOG…`);
+      toast(`Burning ${gift.price} $CHOG…`);
       await waitForTransactionReceipt(config, { hash, chainId: monad.id });
       const res = await api<T>("/api/gifts", { kind, txHash: hash, ...to });
       balance.refetch();

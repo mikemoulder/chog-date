@@ -4,10 +4,9 @@ import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { Bubble, TypingBubble } from "@/components/bubble";
 import { candlesFrom, ChemistryChart, Ticker } from "@/components/chart";
-import { AiBadge, ChogFace, STAGE_LABEL, STAGE_ORDER, StageChip } from "@/components/chog";
-import { cx } from "@/components/primitives";
+import { ChogFace, Driver, STAGE_LABEL, STAGE_ORDER, StageChip } from "@/components/chog";
 import { GiftPanel } from "@/components/gift-panel";
-import { ErrorState, Skeleton, toast } from "@/components/states";
+import { cx, Failed, Skeleton, toast } from "@/components/ui";
 import { api, ApiError, useMe } from "@/lib/client";
 import type { CoupleDetail, Me, Mode } from "@/lib/types";
 
@@ -17,6 +16,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const typingTime = (text: string) => Math.min(2600, 650 + text.length * 28);
 const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
+// The date. The question: how is this date going? Chemistry answers it, as a figure and as
+// one candle per text; the conversation is the main panel; the relationship, gifts and
+// unmasking sit in the rail.
 export default function DatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const qc = useQueryClient();
@@ -126,7 +128,7 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
   }
 
   if (q.isLoading) return <DateSkeleton />;
-  if (q.isError || !c) return <div className="mx-auto max-w-[560px] p-6"><ErrorState onRetry={() => q.refetch()} /></div>;
+  if (q.isError || !c) return <div className="py-8"><Failed what="this date" onRetry={() => q.refetch()} /></div>;
 
   const visible = msgs.slice(0, visibleCount);
   const deltas = msgs.map((m) => m.chemistryDelta);
@@ -134,53 +136,43 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
   const candles = candlesFrom(start, visible.map((m) => m.chemistryDelta).filter((d, i, all) => d !== 0 || i === all.length - 1));
   const shownChem = candles.at(-1)?.close ?? start;
   const lastDelta = [...visible].reverse().find((m) => m.chemistryDelta !== 0)?.chemistryDelta;
+  const texts = msgs.filter((m) => m.author !== "gift").length;
   const inProgress = msgs.length > 0 && !c.session.done;
   const partnerHuman = c.partner.claimed && c.partner.mode !== "autopilot";
   const profileOf = (tokenId: number) => (tokenId === c.me.tokenId ? c.me : c.partner);
 
   return (
-    <div className="mx-auto grid max-w-page gap-6 px-[var(--gutter)] py-5 lg:grid-cols-[1fr_340px]">
-      <section className="sticker sticker-pop flex h-[calc(100dvh-180px)] min-h-[520px] flex-col overflow-hidden md:h-[calc(100dvh-112px)]">
-        {/* The date header: who, how serious, and the chart */}
-        <header className="border-b-2 border-line-strong">
-          <div className="flex items-center justify-between gap-3 p-3 sm:p-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex shrink-0">
-                <ChogFace chog={c.me} size={44} />
-                <ChogFace chog={c.partner} size={44} className="-ml-3" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="truncate text-[18px] font-extrabold leading-tight tracking-tight">
-                  <span className="hidden sm:inline">{c.me.name} </span>
-                  <span className="text-accent">♥</span> {c.partner.name}
-                </h1>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <StageChip stage={c.stage} />
-                  {c.venue && <span className="chip bg-accent-soft">🕯️ Candlelit dinner</span>}
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-fg-mute">
-                    Date #{c.session.index}
-                    {inProgress && ` · ${msgs.filter((m) => m.author !== "gift").length}/${DATE_LENGTH}`}
-                  </span>
-                </div>
-              </div>
+    <div className="grid gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_384px]">
+      <section className="flex h-[calc(100dvh-160px)] min-h-[560px] flex-col overflow-hidden rounded-card bg-surface md:h-[calc(100dvh-96px)]" aria-label={`Date with ${c.partner.name}`}>
+        {/* The object header: who, how far along, and the answer */}
+        <header className="flex items-center justify-between gap-4 px-5 pb-3 pt-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <ChogFace chog={c.partner} size={48} />
+            <div className="min-w-0">
+              <h1 className="truncate text-[18px] font-semibold leading-[24px]">{c.partner.name}</h1>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-faint">
+                <StageChip stage={c.stage} />
+                <span className="num">Date {c.session.index}{inProgress ? ` · ${texts} of ${DATE_LENGTH} texts` : ""}</span>
+                {c.venue && <span className="pill pill-accent">Candlelit dinner</span>}
+              </p>
             </div>
-            <Ticker value={shownChem} delta={lastDelta} className="shrink-0" />
           </div>
-          <div className="border-t-2 border-line bg-surface px-3 py-2">
-            {candles.length ? (
-              <ChemistryChart candles={candles} height={64} />
-            ) : (
-              <p className="flex h-16 items-center justify-center font-mono text-[11px] uppercase tracking-wider text-fg-faint">Every text prints a candle</p>
-            )}
-          </div>
+          <Ticker value={shownChem} delta={lastDelta} className="shrink-0" />
         </header>
+        <div className="px-5 pb-3">
+          {candles.length ? (
+            <ChemistryChart candles={candles} height={56} slots={14} />
+          ) : (
+            <p className="flex h-14 items-center text-[13px] text-faint">Every text prints a candle: filled when it lands, hollow when it flops.</p>
+          )}
+        </div>
 
-        {/* The chat */}
-        <div ref={scroller} className="flex-1 overflow-y-auto bg-ground p-4" aria-live="polite">
+        {/* The conversation */}
+        <div ref={scroller} className="flex-1 overflow-y-auto border-t border-border bg-ground px-4 py-5 sm:px-5" aria-live="polite">
           {msgs.length === 0 && !c.session.done && (
-            <div className="mx-auto max-w-[360px] py-8 text-center">
-              <p className="t-title">Date #{c.session.index} hasn&apos;t started</p>
-              <p className="mt-2 text-[15px] text-fg-mute">
+            <div className="mx-auto max-w-[380px] py-10 text-center">
+              <p className="text-[16px] font-semibold">Date {c.session.index} hasn&apos;t started</p>
+              <p className="mt-1 text-[14px] text-muted">
                 {partnerHuman ? `${c.partner.name}'s human is at the wheel. Say something good.` : `${c.partner.name} is AI-run. It texts back in its own voice, shaped by its traits.`}
               </p>
             </div>
@@ -202,12 +194,12 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         {/* The controls */}
-        <footer className="border-t-2 border-line-strong bg-panel p-3">
+        <footer className="border-t border-border bg-surface p-3 sm:p-4">
           {c.stage === "broken_up" ? (
-            <Link href="/swipe" className="btn btn-action w-full">Back to swiping</Link>
+            <Link href="/swipe" className="btn btn-primary w-full">Back to swiping</Link>
           ) : !c.canDateNow ? (
-            <p className="py-2 text-center text-[14px] text-fg-mute">
-              Next date unlocks {c.nextDateAt ? <b>{relative(c.nextDateAt)}</b> : "soon"}. Absence makes the heart grow fonder. Too much absence and it fades.
+            <p className="py-1 text-center text-[14px] text-muted">
+              Next date {c.nextDateAt ? <span className="num text-text">{relative(c.nextDateAt)}</span> : "soon"}. Leave it too long and the chemistry fades.
             </p>
           ) : (
             <Composer mode={mode} onMode={changeMode} running={running} pending={pending} partnerHuman={partnerHuman} coupleId={id} onSay={say} onAuto={letThemTalk} onStop={() => (stop.current = true)} />
@@ -216,7 +208,7 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
       </section>
 
       <aside className="space-y-4">
-        <Couple c={c} />
+        <Relationship c={c} />
         <GiftPanel coupleId={c.id} partnerName={c.partner.name} disabled={c.stage === "broken_up"} onGiven={() => q.refetch()} />
         <Unmask c={c} onDone={() => q.refetch()} />
       </aside>
@@ -252,47 +244,43 @@ function Composer(props: { mode: Mode; onMode: (m: Mode) => void; running: boole
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-1 rounded-button border-2 border-line-strong p-1" role="radiogroup" aria-label="Who's talking">
-        {(["manual", "copilot", "autopilot"] as Mode[]).map((m) => (
-          <button key={m} role="radio" aria-checked={mode === m} onClick={() => props.onMode(m)} disabled={running} className={cx("h-9 rounded-[8px] font-mono text-[11px] font-semibold uppercase tracking-wider", mode === m ? "bg-fg text-ground" : "hover:bg-fill")}>
-            {m === "manual" ? "You type" : m === "copilot" ? "Co-pilot" : "Autopilot"}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex shrink-0 rounded-full bg-ground p-1" role="radiogroup" aria-label="Who's texting">
+          {(["manual", "copilot", "autopilot"] as Mode[]).map((m) => (
+            <button key={m} role="radio" aria-checked={mode === m} onClick={() => props.onMode(m)} disabled={running} className={cx("h-8 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition-colors", mode === m ? "bg-raised text-text" : "text-faint hover:text-muted")}>
+              {m === "manual" ? "You type" : m === "copilot" ? "Co-pilot" : "Autopilot"}
+            </button>
+          ))}
+        </div>
+        {mode === "copilot" && (
+          <button className="btn btn-text" onClick={suggest} aria-busy={suggesting} disabled={pending}>
+            {options.length ? "Other lines" : "Suggest lines"}
           </button>
-        ))}
+        )}
       </div>
 
       {mode === "autopilot" ? (
         running ? (
-          <button className="btn btn-quiet w-full" onClick={props.onStop}>Stop after this line</button>
+          <button className="btn btn-outline btn-lg w-full" onClick={props.onStop}>Stop after this text</button>
         ) : (
-          <button className="btn btn-accent w-full" onClick={props.onAuto}>
-            {props.partnerHuman ? "Let your Chog say the next line" : "Let them talk"}
+          <button className="btn btn-primary btn-lg w-full" onClick={props.onAuto}>
+            {props.partnerHuman ? "Let your Chog send the next text" : "Let them talk"}
           </button>
         )
       ) : (
         <>
-          {mode === "copilot" && (
-            <div className="flex flex-wrap gap-2">
+          {mode === "copilot" && options.length > 0 && (
+            <div className="flex flex-col gap-1.5">
               {options.map((o) => (
-                <button key={o} onClick={() => setText(o)} className="sticker !shadow-none px-3 py-2 text-left text-[14px] hover:bg-accent-soft">
+                <button key={o} onClick={() => setText(o)} className="rounded-[14px] bg-ground px-3.5 py-2 text-left text-[14px] text-muted transition-colors hover:bg-raised hover:text-text">
                   {o}
                 </button>
               ))}
-              <button className="btn btn-quiet btn-sm" onClick={suggest} aria-busy={suggesting} disabled={pending}>
-                {options.length ? "More lines" : "Suggest lines"}
-              </button>
             </div>
           )}
           <form onSubmit={send} className="flex gap-2">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={280}
-              placeholder="Say something, in character"
-              aria-label="Your Chog's next line"
-              className="field-input h-12 flex-1 !border-2 !border-line-strong"
-              disabled={pending}
-            />
-            <button className="btn btn-action" aria-busy={pending} disabled={!text.trim()}>
+            <input value={text} onChange={(e) => setText(e.target.value)} maxLength={280} placeholder="Text them as your Chog" aria-label="Your Chog's next text" className="field !h-11" disabled={pending} />
+            <button className="btn btn-primary !h-11" aria-busy={pending} disabled={!text.trim()}>
               Send
             </button>
           </form>
@@ -305,76 +293,85 @@ function Composer(props: { mode: Mode; onMode: (m: Mode) => void; running: boole
 function Recap({ c }: { c: CoupleDetail }) {
   const [headline, ...rest] = (c.session.summary ?? "Date over.").split(": ");
   return (
-    <div className="sticker mx-auto max-w-[460px] overflow-hidden text-center" style={{ animation: "pop-in 240ms var(--motion-out) both" }}>
-      <div className="border-b-2 border-line-strong bg-accent px-4 py-2 font-mono text-[11px] font-semibold uppercase tracking-wider">The Daily Chog · date #{c.session.index}</div>
-      <div className="p-4">
-        <p className="text-[20px] font-extrabold leading-tight tracking-tight">{headline}</p>
-        {rest.length > 0 && <p className="mt-2 text-[15px] text-fg-soft">{rest.join(": ")}</p>}
-      </div>
+    <div className="mx-auto mt-4 max-w-[460px] rounded-panel bg-surface p-5" style={{ animation: "pop-in 240ms var(--ease) both" }}>
+      <p className="text-[12px] text-faint">The Daily Chog · date {c.session.index}</p>
+      <p className="mt-1 text-[18px] font-semibold leading-[24px]">{headline}</p>
+      {rest.length > 0 && <p className="mt-2 text-[14px] text-muted">{rest.join(": ")}</p>}
     </div>
   );
 }
 
-function Couple({ c }: { c: CoupleDetail }) {
+function Relationship({ c }: { c: CoupleDetail }) {
   const at = STAGE_ORDER.indexOf(c.stage);
   return (
-    <div className="sticker p-4">
-      <p className="t-label">Relationship</p>
-      <ol className="mt-3 grid grid-cols-5 gap-1">
+    <section className="rounded-card bg-surface p-5" aria-labelledby="rel">
+      <div className="flex items-baseline justify-between">
+        <h2 id="rel" className="text-[16px] font-semibold">Relationship</h2>
+        <span className="num text-[13px] text-faint">{c.dates} date{c.dates === 1 ? "" : "s"} so far</span>
+      </div>
+      <ol className="mt-4 grid grid-cols-5 gap-1.5">
         {STAGE_ORDER.map((s, i) => (
-          <li key={s} className="text-center">
-            <div className={cx("h-2.5 rounded-chip border-2 border-line-strong", i <= at ? "bg-accent" : "bg-surface")} />
-            <span className={cx("mt-1 block font-mono text-[9px] uppercase tracking-wider", i === at ? "text-fg" : "text-fg-faint")}>{STAGE_LABEL[s]}</span>
+          <li key={s}>
+            <div className={cx("h-1.5 rounded-full", i <= at ? "bg-accent" : "bg-raised")} />
+            <span className={cx("mt-2 block text-[12px]", i === at ? "text-text" : "text-faint")}>{STAGE_LABEL[s]}</span>
           </li>
         ))}
       </ol>
-      <div className="mt-4 grid grid-cols-[auto_1fr] gap-3 border-t-2 border-line pt-4">
-        <ChogFace chog={c.partner} size={64} />
+      <p className="mt-4 text-[13px] text-muted">{nextStep(c)}</p>
+      <div className="mt-5 flex gap-3 border-t border-rule pt-4">
+        <ChogFace chog={c.partner} size={44} />
         <div className="min-w-0">
-          <p className="text-[16px] font-extrabold leading-tight">{c.partner.name}</p>
-          <p className="text-[13px] font-bold">{c.partner.persona.archetype}</p>
-          <AiBadge profile={c.partner} className="mt-1.5" />
+          <p className="flex items-center gap-2 text-[14px] font-semibold">{c.partner.name} <Driver profile={c.partner} /></p>
+          <p className="text-[13px] text-faint">{c.partner.persona.archetype}</p>
+          <p className="mt-2 text-[13px] leading-[19px] text-muted">{c.partner.bio}</p>
         </div>
       </div>
-      <p className="mt-3 text-[14px] text-fg-soft">{c.partner.bio}</p>
-      <dl className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
-        <div><dt className="t-label">Love language</dt><dd>{c.partner.persona.loveLanguage}</dd></div>
-        <div><dt className="t-label">Red flag</dt><dd>{c.partner.persona.redFlag}</dd></div>
+      <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
+        <div><dt className="text-faint">Love language</dt><dd className="mt-0.5">{c.partner.persona.loveLanguage}</dd></div>
+        <div><dt className="text-faint">Red flag</dt><dd className="mt-0.5">{c.partner.persona.redFlag}</dd></div>
       </dl>
-      <p className="mt-4 border-t-2 border-line pt-3 text-[13px] text-fg-mute">Dates so far: {c.dates}. Married takes 5 dates and chemistry over 82.</p>
-    </div>
+    </section>
   );
+}
+
+// The rule for the next stage, from the same thresholds the server uses.
+function nextStep(c: CoupleDetail) {
+  const rules: Record<string, [string, number, number]> = { first_date: ["Dating", 2, 50], matched: ["Dating", 2, 50], dating: ["Official", 3, 65], official: ["Married", 5, 82] };
+  if (c.stage === "married") return "Married. It doesn't get more official than this.";
+  if (c.stage === "broken_up") return "It's over. Chemistry dropped too low.";
+  const [next, dates, chem] = rules[c.stage];
+  const needDates = Math.max(0, dates - c.dates), needChem = Math.max(0, chem - c.chemistry);
+  if (!needDates && !needChem) return `${next} after this date ends.`;
+  return `${next} needs ${[needDates && `${needDates} more date${needDates === 1 ? "" : "s"}`, needChem && `chemistry ${chem}`].filter(Boolean).join(" and ")}.`;
 }
 
 function Unmask({ c, onDone }: { c: CoupleDetail; onDone: () => void }) {
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(false);
   const unlocked = c.stage === "official" || c.stage === "married";
-  const partnerHuman = c.partner.claimed;
-  if (!unlocked || !partnerHuman) {
+  if (!unlocked || !c.partner.claimed) {
     return (
-      <div className="sticker !shadow-none border-dashed p-4">
-        <p className="t-label">Unmask</p>
-        <p className="mt-2 text-[14px] text-fg-mute">
-          {!partnerHuman ? `${c.partner.name} has no human yet. When its holder claims it, you can meet them once you're Official.` : "Get to Official and you can both choose to reveal the humans behind the Chogs."}
+      <section className="rounded-card border border-dashed border-control p-5" aria-labelledby="unmask">
+        <h2 id="unmask" className="text-[16px] font-semibold">Unmask</h2>
+        <p className="mt-1 text-[13px] text-muted">
+          {!c.partner.claimed ? `${c.partner.name} has no human yet. When its holder claims it and you're Official, you can both reveal yourselves.` : "Once you're Official, you can both choose to reveal the humans behind the Chogs."}
         </p>
-      </div>
+      </section>
     );
   }
   if (c.unmask.partnerHandle) {
     return (
-      <div className="sticker bg-accent-soft p-4">
-        <p className="t-label !text-fg">Unmasked</p>
-        <p className="mt-2 text-[15px]">The human behind {c.partner.name} is <b>@{c.unmask.partnerHandle}</b>. Say hi.</p>
-      </div>
+      <section className="rounded-card bg-surface p-5" aria-labelledby="unmask">
+        <h2 id="unmask" className="text-[16px] font-semibold">Unmasked</h2>
+        <p className="mt-2 text-[13px] text-faint">The human behind {c.partner.name}</p>
+        <p className="text-[24px] font-semibold">@{c.unmask.partnerHandle}</p>
+      </section>
     );
   }
   return (
-    <div className="sticker p-4">
-      <p className="t-label">Unmask</p>
-      <p className="mt-2 text-[14px] text-fg-soft">
-        {c.unmask.me ? "You've revealed your handle. Waiting for their human to do the same." : "You're Official. Reveal your X or Discord handle; they only see it if they reveal theirs too."}
-      </p>
+    <section className="rounded-card bg-surface p-5" aria-labelledby="unmask">
+      <h2 id="unmask" className="text-[16px] font-semibold">Unmask</h2>
+      <p className="mt-1 text-[13px] text-muted">{c.unmask.me ? "Your handle is in. They see it only if they reveal theirs too." : "Share your X or Discord handle. They only see it if they share theirs."}</p>
       {!c.unmask.me && (
         <form
           className="mt-3 flex gap-2"
@@ -391,23 +388,24 @@ function Unmask({ c, onDone }: { c: CoupleDetail; onDone: () => void }) {
             }
           }}
         >
-          <input className="field-input h-11 flex-1 !border-2 !border-line-strong" placeholder="@handle" value={handle} onChange={(e) => setHandle(e.target.value)} aria-label="Your handle" />
-          <button className="btn btn-action !h-11" aria-busy={busy} disabled={!handle.trim()}>Reveal</button>
+          <input className="field" placeholder="@handle" value={handle} onChange={(e) => setHandle(e.target.value)} aria-label="Your handle" />
+          <button className="btn btn-primary" aria-busy={busy} disabled={!handle.trim()}>Reveal</button>
         </form>
       )}
-    </div>
+    </section>
   );
 }
 
 function DateSkeleton() {
   return (
-    <div className="mx-auto max-w-page px-[var(--gutter)] py-5" aria-busy>
-      <div className="sticker space-y-3 p-4">
-        <Skeleton className="h-10 w-2/3" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-12 w-3/4" />
-        <Skeleton className="ml-auto h-12 w-2/3" />
+    <div className="grid gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_384px]" aria-busy>
+      <div className="space-y-4 rounded-card bg-surface p-5">
+        <div className="flex items-center gap-3"><Skeleton className="h-12 w-12 !rounded-full" /><h1 className="text-[18px] font-semibold text-faint">Loading the date</h1></div>
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-10 w-2/3 !rounded-[18px]" />
+        <Skeleton className="ml-auto h-10 w-1/2 !rounded-[18px]" />
       </div>
+      <Skeleton className="h-72 w-full !rounded-card" />
     </div>
   );
 }
@@ -416,5 +414,5 @@ function relative(iso: string) {
   const ms = new Date(iso).getTime() - Date.now();
   if (ms <= 0) return "now";
   const h = Math.floor(ms / 3600_000), m = Math.ceil((ms % 3600_000) / 60_000);
-  return h ? `in ${h}h ${m}m` : `in ${m}m`;
+  return h ? `in ${h} h ${m} m` : `in ${m} m`;
 }

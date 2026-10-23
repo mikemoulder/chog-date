@@ -9,10 +9,10 @@ export const CHOG_DECIMALS = 18;
 
 export type GiftKind = "rose" | "dinner" | "superlike";
 
-export const GIFTS: Record<GiftKind, { label: string; icon: string; price: number; chemistry: number; blurb: string }> = {
-  rose: { label: "Rose", icon: "🌹", price: 100, chemistry: 4, blurb: "+4 chemistry. They'll react in character." },
-  dinner: { label: "Candlelit dinner", icon: "🕯️", price: 500, chemistry: 8, blurb: "+8 chemistry, and this date happens over dinner." },
-  superlike: { label: "Super-like", icon: "⭐", price: 200, chemistry: 0, blurb: "AI-run Chogs always like back. Humans see it first." },
+export const GIFTS: Record<GiftKind, { label: string; price: number; chemistry: number; blurb: string }> = {
+  rose: { label: "Rose", price: 100, chemistry: 4, blurb: "+4 chemistry. They react in character." },
+  dinner: { label: "Candlelit dinner", price: 500, chemistry: 8, blurb: "+8 chemistry, and this date happens over dinner." },
+  superlike: { label: "Super-like", price: 200, chemistry: 0, blurb: "AI-run Chogs always like back. Humans see it first." },
 };
 
 export const DINNER_VENUE = "a candlelit dinner they paid for in $CHOG";

@@ -1,124 +1,153 @@
-import { Bubble } from "@/components/bubble";
-import { candlesFrom, ChemistryChart, Ticker } from "@/components/chart";
-import { ChogFace, StageChip } from "@/components/chog";
-import { GateCta } from "@/components/gate-cta";
-import { Wordmark } from "@/components/shell";
+import Link from "next/link";
+import { Lookup } from "@/components/landing/lookup";
+import { PrimaryAction } from "@/components/landing/cta";
+import { Roses } from "@/components/landing/roses";
+import { Stages } from "@/components/landing/stages";
+import { Logo } from "@/components/shell";
+import { allChogs, imageFor } from "@/lib/chogs";
+import { lookup } from "@/lib/lookup";
 
-// An example date between two real Chogs, written from their traits. Labelled as an example.
-const A = { tokenId: 2, name: "Chog #1463", image: "/chogs/2.webp" }; // Chog Cap, Mon Hoodie, Modern VR
-const B = { tokenId: 12, name: "Chog #1473", image: "/chogs/12.webp" }; // Kings Robe, Gold Tooth, Side Eye
-const LINES: [typeof A, string, number][] = [
-  [B, "Modern VR goggles on a first date. Bold. Am I being livestreamed?", 2],
-  [A, "Only to my 10k TPS heart. Nice robe, your majesty. Is the gold tooth load-bearing?", 6],
-  [B, "It's an heirloom. Unlike your hoodie, which is merch.", -4],
-  [A, "Monad merch is couture. Also you've side-eyed me four times and I'm counting it as flirting.", 8],
-  [B, "…Fine. It's flirting. Don't tell the court.", 9],
-];
-const FACES = [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+// The page: "the sentence is the layout" (taste-skill, seed 62795678).
+// Idea: the 1,969 Chog faces become the word "Chog" in "Your Chog is single."
 
-export default function Gate() {
-  const candles = candlesFrom(48, LINES.map((l) => l[2]));
-  const chem = candles.at(-1)!.close;
+const OPENSEA = "https://opensea.io/collection/chog-genesis";
+const DEX = "https://dexscreener.com/monad/0x350035555e10d9afaf1566aaebfced5ba6c27777";
+
+// One Chog per background colour, so the strip shows the collection's range.
+function stripFaces() {
+  const seen = new Set<string>();
+  const out: number[] = [];
+  for (const c of allChogs()) {
+    const bg = c.traits.Background;
+    if (seen.has(bg) || c.traits.Form === "Skull") continue;
+    seen.add(bg);
+    out.push(c.tokenId);
+    if (out.length === 14) break;
+  }
+  return out;
+}
+
+export default function Home() {
+  const faces = stripFaces();
+  const strip = [...faces, ...faces];
   return (
-    <div className="min-h-dvh overflow-x-clip">
-      <header className="border-b-2 border-line-strong">
-        <div className="mx-auto flex h-16 max-w-page items-center justify-between px-[var(--gutter)]">
-          <Wordmark />
-          <span className="chip bg-accent">Chog Genesis holders only</span>
-        </div>
-      </header>
-
-      <main>
-        <section className="mx-auto grid max-w-page items-center gap-10 px-[var(--gutter)] py-10 lg:grid-cols-[1.1fr_1fr] lg:py-16">
-          <div>
-            <p className="t-label !text-fg-mute">A dating app for 1,969 NFTs</p>
-            <h1 className="t-display-xl mt-4">
-              Your Chog
-              <br />
-              is single.
-            </h1>
-            <p className="t-lead mt-6 max-w-[34ch] !text-fg-soft">
-              Every Chog already has a dating profile, written from its traits. Connect, pick your Chog, and swipe. It dates in character. You&apos;re the wingman.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <GateCta />
-              <span className="max-w-[24ch] text-[13px] text-fg-mute">Sign a message to prove you hold a Chog. No transaction, no gas.</span>
-            </div>
+    <main className="overflow-x-clip bg-orange text-[17px] leading-[1.5] text-ink">
+      {/* Hero: the sentence, with the faces where the word would be */}
+      <section className="relative flex min-h-svh flex-col px-4 sm:px-7">
+        <nav className="flex h-16 items-center justify-between text-[17px]" aria-label="Main">
+          <Link href="/">
+            <Logo />
+          </Link>
+          <div className="flex gap-6">
+            <a href="#how" className="hover:underline">
+              How it works
+            </a>
+            <a href={OPENSEA} target="_blank" rel="noreferrer" className="hover:underline">
+              Get a Chog
+            </a>
           </div>
+        </nav>
 
-          {/* The signature: a date that trades like a chart */}
-          <figure className="sticker sticker-pop overflow-hidden" aria-label="Example date">
-            <div className="flex items-center justify-between gap-3 border-b-2 border-line-strong p-3">
-              <div className="flex items-center gap-3">
-                <div className="flex">
-                  <ChogFace chog={A} size={40} />
-                  <ChogFace chog={B} size={40} className="-ml-3" />
-                </div>
-                <div>
-                  <p className="text-[16px] font-extrabold leading-tight">
-                    {A.name} <span className="text-accent">♥</span> {B.name}
-                  </p>
-                  <StageChip stage="first_date" className="mt-1" />
-                </div>
-              </div>
-              <Ticker value={chem} delta={LINES.at(-1)![2]} />
-            </div>
-            <div className="border-b-2 border-line bg-surface px-3 py-2">
-              <ChemistryChart candles={candles} height={60} slots={8} />
-            </div>
-            <div className="space-y-3 bg-ground p-4">
-              {LINES.map(([who, body, d], i) => (
-                <Bubble key={i} from={who} mine={who === A} body={body} delta={d} />
-              ))}
-            </div>
-            <figcaption className="border-t-2 border-line-strong bg-panel px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-fg-mute">
-              Example date · both Chogs on autopilot
-            </figcaption>
-          </figure>
-        </section>
-
-        <div className="marquee border-y-2 border-line-strong bg-accent py-3" aria-hidden>
-          <div className="marquee-track flex w-max gap-3">
-            {[...FACES, ...FACES].map((id, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={`/chogs/${id}.webp`} alt="" width={72} height={72} className="h-[72px] w-[72px] rounded-tile border-2 border-line-strong" />
-            ))}
+        <div className="flex flex-1 flex-col justify-center">
+          <h1 className="text-[16vw] font-semibold tracking-[-0.045em] sm:text-[clamp(64px,8.6vw,168px)]" style={{ lineHeight: 0.95 }}>
+            <span className="flex flex-col items-start gap-[0.12em] sm:flex-row sm:items-baseline sm:gap-[0.22em]">
+              <span>Your</span>
+              <span className="sr-only">Chog</span>
+              <span
+                aria-hidden
+                className="relative block aspect-[2/1] w-full overflow-hidden rounded-[14px] bg-ink sm:aspect-auto sm:h-[0.74em] sm:flex-1 sm:self-center sm:translate-y-[0.06em]"
+                style={{ animation: "shutter 1.1s var(--ease) both" }}
+              >
+                <span className="absolute inset-0 flex" style={{ animation: "settle 1.4s var(--ease) both" }}>
+                  <span className="flex h-full w-max" style={{ animation: "strip 46s linear infinite" }}>
+                    {strip.map((id, n) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={n} src={imageFor(id)} alt="" width={512} height={512} className="h-full w-auto shrink-0 object-cover" />
+                    ))}
+                  </span>
+                </span>
+              </span>
+              <span className="whitespace-nowrap">is single.</span>
+            </span>
+          </h1>
+          <div className="mt-10 flex justify-center sm:mt-[min(150px,12vh)]">
+            <PrimaryAction />
           </div>
         </div>
 
-        <section className="mx-auto max-w-page px-[var(--gutter)] py-[var(--section-y)]">
-          <h2 className="t-display-l max-w-[18ch]">The NFT does the dating. You do the wingman work.</h2>
-          <ol className="mt-10 grid border-t-2 border-line-strong md:grid-cols-3">
-            {[
-              ["01", "Every Chog has a profile", "All 1,969 Chogs get a personality written from their traits. Laser eyes, a Kings Robe or a Fwog in hand all change who they are and who they fall for."],
-              ["02", "Swipe as your Chog", "Compatibility comes from traits, with reasons on every card. Chogs whose holders haven't arrived are AI-run and answer right away, clearly labelled."],
-              ["03", "Date in character", "Type the lines yourself, pick from three your Chog suggests, or put it on autopilot. Every line moves the chemistry. Five good dates and they're married."],
-            ].map(([n, t, b]) => (
-              <li key={n} className="border-b-2 border-line-strong py-6 md:border-b-0 md:border-r-2 md:px-6 md:first:pl-0 md:last:border-r-0">
-                <span className="font-mono text-[12px] font-semibold text-fg-faint">{n}</span>
-                <h3 className="t-title mt-2">{t}</h3>
-                <p className="mt-2 text-[15px] text-fg-soft">{b}</p>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-12 grid gap-6 border-t-2 border-line-strong pt-8 md:grid-cols-2">
-            <p className="text-[17px] font-bold">Sell the Chog and its love life goes with it.</p>
-            <p className="text-[15px] text-fg-soft">
-              Relationships belong to the token, not the wallet. Ownership is checked on Monad on every action. When a new holder claims a Chog, they see everything it got up to while it was AI-run, and take over from there.
-            </p>
-          </div>
-        </section>
-      </main>
-
-      <footer className="overflow-hidden border-t-2 border-line-strong">
-        <div className="mx-auto flex max-w-page flex-wrap items-center justify-between gap-4 px-[var(--gutter)] py-6 text-[13px] text-fg-mute">
-          <span>Built for Chogathon 2026. Not affiliated with Chog Labs.</span>
-          <a href="https://opensea.io/collection/chog-genesis" target="_blank" rel="noreferrer" className="underline underline-offset-4">Chog Genesis on OpenSea</a>
-        </div>
-        <p className="select-none whitespace-nowrap px-[var(--gutter)] text-[22vw] font-extrabold leading-[0.75] tracking-[-0.06em] text-fg" aria-hidden>
-          chog date
+        <p className="mx-auto mb-12 mt-10 max-w-[44ch] text-center text-[18px] leading-[1.45] sm:text-[22px]">
+          A dating app for the 1,969 Chog Genesis NFTs. Your Chog swipes, texts and falls in love in character. You&apos;re the wingman.
         </p>
+      </section>
+
+      {/* Showcase: the headline is an input */}
+      <section className="min-h-[88svh] bg-paper px-4 py-16 sm:px-7 lg:py-24" aria-labelledby="profiles">
+        <h2 id="profiles" className="max-w-[18ch] font-semibold tracking-[-0.03em]" style={{ fontSize: "var(--step-head)", lineHeight: 1 }} data-rise>
+          Every Chog already has a profile.
+        </h2>
+        <p className="mt-4 max-w-[52ch] text-[17px]" data-rise style={{ "--d": "80ms" } as React.CSSProperties}>
+          All 1,969 have a personality written from their traits, before their holder ever signs in. Try one.
+        </p>
+        <div className="mt-10" data-rise style={{ "--d": "160ms" } as React.CSSProperties}>
+          <Lookup initial={lookup("Kings Robe")} />
+        </div>
+      </section>
+
+      {/* How it works: drag through the stages */}
+      <section id="how" aria-label="How it works">
+        <Stages />
+      </section>
+
+      {/* Stats: the figure is the visitor's own */}
+      <section aria-label="Roses">
+        <Roses />
+      </section>
+
+      {/* CTA: a question at both edges */}
+      <section className="relative flex h-svh min-h-[560px] flex-col items-center justify-between bg-ink px-4 py-8 text-orange sm:px-7">
+        <h2 className="flex h-full w-full flex-col items-center justify-between text-center font-semibold tracking-[-0.045em]" style={{ fontSize: "clamp(64px, 8.6vw, 168px)", lineHeight: 1 }}>
+          <span>Got a Chog?</span>
+          <span>Want one?</span>
+        </h2>
+        <div className="absolute inset-x-4 top-1/2 flex -translate-y-1/2 flex-col items-center gap-3 sm:inset-x-7">
+          <div className="flex w-[72%] flex-col items-center gap-3 sm:w-auto sm:flex-row sm:gap-0">
+            <PrimaryAction tone="orange" size="lg" />
+            <span className="text-[17px] text-orange/70 sm:mx-14">or</span>
+            <a className="btn btn-lg !bg-paper !text-ink hover:!bg-[#eee]" href={OPENSEA} target="_blank" rel="noreferrer">
+              Find one on OpenSea
+            </a>
+          </div>
+          <p className="mt-2 text-center text-[17px] text-orange/80">Connecting asks for one signature to prove you hold a Chog. No transaction, no gas.</p>
+        </div>
+      </section>
+
+      {/* Footer: an invitation over the cropped name */}
+      <footer className="relative flex min-h-svh flex-col overflow-hidden bg-orange px-4 pt-16 sm:px-7">
+        <div className="grid gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-7" data-rise>
+            <h2 className="max-w-[14ch] font-semibold tracking-[-0.04em]" style={{ fontSize: "var(--step-head)", lineHeight: 0.98 }}>
+              Your Chog&apos;s first date is waiting.
+            </h2>
+            <div className="mt-8">
+              <PrimaryAction />
+            </div>
+          </div>
+          <ul className="space-y-2 text-[17px] lg:col-span-3 lg:col-start-10" data-rise style={{ "--d": "100ms" } as React.CSSProperties}>
+            <li><a className="hover:underline" href={OPENSEA} target="_blank" rel="noreferrer">Chog Genesis on OpenSea</a></li>
+            <li><a className="hover:underline" href={DEX} target="_blank" rel="noreferrer">$CHOG on DEX Screener</a></li>
+            <li><a className="hover:underline" href="https://chogathon.chog.xyz" target="_blank" rel="noreferrer">Built for Chogathon 2026</a></li>
+          </ul>
+        </div>
+        <div className="mt-auto">
+          <div className="flex flex-wrap justify-between gap-2 pb-3 text-[13px] text-ink-soft">
+            <span>Chog artwork: Chog Genesis by ChogLabs, shown for its holders. Not affiliated with ChogLabs.</span>
+            <span>Gifts are burned, never paid to anyone.</span>
+          </div>
+          <p className="select-none whitespace-nowrap font-semibold tracking-[-0.06em]" style={{ fontSize: "clamp(120px, 28vw, 520px)", lineHeight: 0.8, transform: "translateY(22%)" }} aria-hidden>
+            chog date
+          </p>
+        </div>
       </footer>
-    </div>
+    </main>
   );
 }

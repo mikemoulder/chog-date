@@ -1,8 +1,8 @@
-import { cx } from "./primitives";
+import { cx } from "./ui";
 import type { Profile } from "@/lib/types";
 
-// A Chog's face, as a sticker. The art already has its own outline and background.
-export function ChogFace({ chog, size = 56, className, ring }: { chog: Pick<Profile, "tokenId" | "name" | "image">; size?: number; className?: string; ring?: "accent" }) {
+// A Chog's face. People and tokens are circles; the art keeps its own background.
+export function ChogFace({ chog, size = 48, className, square }: { chog: Pick<Profile, "tokenId" | "name" | "image">; size?: number; className?: string; square?: boolean }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -11,18 +11,19 @@ export function ChogFace({ chog, size = 56, className, ring }: { chog: Pick<Prof
       width={size}
       height={size}
       loading="lazy"
-      className={cx("shrink-0 rounded-tile border-2 border-line-strong bg-surface object-cover", ring === "accent" && "outline-2 outline-offset-2 outline-accent", className)}
+      className={cx("shrink-0 bg-raised object-cover", square ? "rounded-media" : "rounded-full", className)}
       style={{ width: size, height: size }}
     />
   );
 }
 
-export function AiBadge({ profile, className }: { profile: Pick<Profile, "claimed" | "mode">; className?: string }) {
-  if (profile.claimed && profile.mode !== "autopilot") return <span className={cx("chip", className)}>Human at the wheel</span>;
-  return <span className={cx("chip bg-surface", className)}>{profile.claimed ? "Autopilot · AI" : "Unclaimed · AI-run"}</span>;
+// Who is behind a Chog. AI-run Chogs are always labelled.
+export function Driver({ profile, className }: { profile: Pick<Profile, "claimed" | "mode">; className?: string }) {
+  if (profile.claimed && profile.mode !== "autopilot") return <span className={cx("pill pill-positive", className)}>Human</span>;
+  return <span className={cx("pill", className)}>{profile.claimed ? "Autopilot" : "AI-run"}</span>;
 }
 
-const STAGE_LABEL: Record<string, string> = {
+export const STAGE_LABEL: Record<string, string> = {
   matched: "Matched",
   first_date: "First date",
   dating: "Dating",
@@ -30,10 +31,8 @@ const STAGE_LABEL: Record<string, string> = {
   married: "Married",
   broken_up: "Broken up",
 };
+export const STAGE_ORDER = ["matched", "first_date", "dating", "official", "married"];
 
 export function StageChip({ stage, className }: { stage: string; className?: string }) {
-  return <span className={cx("chip", stage === "married" || stage === "official" ? "bg-accent" : stage === "broken_up" ? "bg-danger-soft" : "", className)}>{STAGE_LABEL[stage] ?? stage}</span>;
+  return <span className={cx("pill", stage === "official" || stage === "married" ? "pill-accent" : stage === "broken_up" ? "pill-negative" : "", className)}>{STAGE_LABEL[stage] ?? stage}</span>;
 }
-
-export const STAGE_ORDER = ["matched", "first_date", "dating", "official", "married"];
-export { STAGE_LABEL };

@@ -50,3 +50,6 @@ next-env.d.ts
 /.agents/
 /.claude/
 skills-lock.json
+
+# design skill working files (screenshots, direction sheets)
+/.taste-skill/

@@ -1,644 +1,216 @@
-/* Design tokens and primitives for Tailwind v4.
- *
- * Copy to src/app/globals.css. Then replace ONLY the block between
- * TOKENS:START and TOKENS:END with the direction chosen in DESIGN.md
- * (references/directions.md has a paste-in block for each one). Everything
- * below the tokens reads them, so the whole site changes with that block.
- *
- * Three guards against slop are built in:
- *   1. The default Tailwind palette is removed. A palette class like bg-sky-500 renders
- *      nothing. The palette is the tokens, or it is not on the page.
- *   2. The default shadow scale is removed. shadow-2xl renders nothing.
- *      Elevation is shadow-card, shadow-pop or shadow-frame.
- *   3. Radius is named by component (rounded-tile, rounded-panel), so a
- *      card and a button cannot drift into the same arbitrary corner.
- *
- * Tailwind v3? This file will not work. See references/scaffold.md.
- */
+/* Chog Date. Two surfaces, one face (Switzer):
+ *   the app   true-black flat (taste-skill app style, seed 1555159311): elevation by lightness,
+ *             colour only on data, the one data hue is Chog orange.
+ *   the page  "the sentence is the layout" (seed 62795678): hot orange field, blue-black ink.
+ * No gradients, glows, glass, resting shadows, eyebrows or monospace. */
 
 @import "tailwindcss";
 
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .theme-dark, .theme-dark *));
-
-/* ── TOKENS:START ──────────────── direction: bold-signal, sticker variant ── */
-:root,
-.theme-light {
-  color-scheme: light;
-  --ground: #f4efe4;
-  --surface: #ebe4d4;
-  --surface-2: #e0d8c5;
-  --panel: #fffaf0;
-  --tile: #fffaf0;
-  --fill: rgb(17 14 20 / 0.06);
-  --fill-strong: rgb(17 14 20 / 0.12);
-  --glass: rgb(244 239 228 / 0.92);
-  --glass-line: #110e14;
-  --fg: #110e14;
-  --fg-soft: #2c2730;
-  --fg-mute: #5a5360;
-  --fg-faint: #7d7682;
-  --line: #d9d0bd;
-  --line-strong: #110e14;
-  --action: #110e14;
-  --on-action: #fffaf0;
-  --action-hover: #2c2730;
-  --accent: #ff3d8b; /* love / like / match. A fill, never body text */
-  --accent-soft: #ffd3e4;
-  --on-accent-soft: #110e14;
-  --success: #12a150; /* green candle */
-  --success-soft: #d5f3e0;
-  --warning: #9a6200;
-  --warning-soft: #fbecc9;
-  --danger: #e5322d; /* red candle */
-  --danger-soft: #fbdcda;
-  --focus: #110e14;
-  --elev-card: 3px 3px 0 #110e14;
-  --elev-pop: 6px 6px 0 #110e14;
-  --elev-frame: 0 0 0 2px #110e14;
-  --field-a: #fffaf0;
-  --field-b: #e0d8c5;
-  --field-c: #ffd3e4;
-}
-
 :root {
-  --display-weight: 800;
-  --display-xl: clamp(52px, 9vw, 140px);
-  --display-xl-lh: 0.88;
-  --display-xl-tracking: -0.05em;
-  --display-l: clamp(34px, 5vw, 64px);
-  --display-l-lh: 0.95;
-  --display-l-tracking: -0.04em;
-  --display-m: clamp(24px, 2.6vw, 34px);
-  --display-m-lh: 1.05;
-  --display-m-tracking: -0.03em;
-  --title: 20px;
-  --title-lh: 1.2;
-  --title-tracking: -0.02em;
-  --title-weight: 700;
-  --lead: 18px;
-  --lead-lh: 1.5;
-  --body: 16px;
-  --body-lh: 1.5;
-  --body-weight: 400;
-  --small: 14px;
-  --small-lh: 1.45;
-  --label: 11px;
-  --label-lh: 1.2;
-  --label-tracking: 0.08em;
-  --label-weight: 500;
-  --label-transform: uppercase;
-  --label-family: var(--font-mono);
-  --ui-weight: 700;
-  --num-weight: 800;
-  --r-chip: 999px;
-  --r-button: 12px;
-  --r-input: 12px;
-  --r-tile: 14px;
-  --r-panel: 18px;
-  --r-feature: 22px;
-  --page-max: 1200px;
-  --gutter: 16px;
-  --section-y: clamp(56px, 8vw, 112px);
-  --stack: 32px;
-  --motion-out: cubic-bezier(0.2, 0.9, 0.2, 1);
-  --motion-in-out: cubic-bezier(0.7, 0, 0.3, 1);
-  --dur-micro: 100ms;
-  --dur-ui: 160ms;
-  --dur-reveal: 280ms;
-  --reveal-y: 0px;
-}
-/* ── TOKENS:END ───────────────────────────────────────────────────────── */
+  /* app: true black */
+  --ground: #000000;
+  --surface: #111111;
+  --raised: #2a2a2a;
+  --active: #222222;
+  --border: #1a1a1a;
+  --rule: #161616;
+  --control: #444444;
+  --text: #ffffff;
+  --muted: #b4b4b4;
+  --faint: #949494;
+  --primary: #ffffff;
+  --on-primary: #000000;
+  --accent: #ff7a1f; /* data only: the chemistry series, the like, the compatibility figure */
+  --accent-soft: #2b1608;
+  --positive: #3fc07a;
+  --pill-positive-bg: #172a1d;
+  --negative: #e5566f;
+  --pill-negative-bg: #2c1a20;
+  --grid: #2b2b2b;
 
-/* Projector mode. CONFIG demo.surface: projector, add class="projector" to
-   <html>. Muted text rises to about 7:1 and hairlines thicken so they
-   survive the beam. */
-.projector {
-  --fg-mute: color-mix(in oklab, var(--fg) 78%, var(--ground));
-  --fg-faint: color-mix(in oklab, var(--fg) 62%, var(--ground));
-  --line: color-mix(in oklab, var(--fg) 22%, var(--ground));
-  --line-strong: color-mix(in oklab, var(--fg) 40%, var(--ground));
-  --body: 17px;
+  /* page: orange and black */
+  --orange: #ff7a1f;
+  --orange-2: #ff8633;
+  --ink: #050f16;
+  --ink-soft: #5a2306;
+  --paper: #ffffff;
+
+  --radius-card: 20px;
+  --radius-panel: 14px;
+  --radius-media: 10px;
+  --gap: 16px;
+  --font: "Switzer", ui-sans-serif, system-ui, sans-serif;
+
+  /* page type steps */
+  --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+  --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+  --step-head: clamp(2rem, 1.3rem + 3.2vw, 4rem);
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ── The palette is the tokens ─────────────────────────────────────────── */
 @theme {
   --color-*: initial;
   --shadow-*: initial;
-  --color-white: #ffffff;
-  --color-black: #000000;
 }
 
 @theme inline {
   --color-ground: var(--ground);
   --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-panel: var(--panel);
-  --color-tile: var(--tile);
-  --color-fill: var(--fill);
-  --color-fill-strong: var(--fill-strong);
-  --color-glass: var(--glass);
-  --color-glass-line: var(--glass-line);
-  --color-fg: var(--fg);
-  --color-fg-soft: var(--fg-soft);
-  --color-fg-mute: var(--fg-mute);
-  --color-fg-faint: var(--fg-faint);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-action: var(--action);
-  --color-on-action: var(--on-action);
-  --color-action-hover: var(--action-hover);
+  --color-raised: var(--raised);
+  --color-active: var(--active);
+  --color-border: var(--border);
+  --color-rule: var(--rule);
+  --color-control: var(--control);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
-  --color-on-accent-soft: var(--on-accent-soft);
-  --color-success: var(--success);
-  --color-success-soft: var(--success-soft);
-  --color-warning: var(--warning);
-  --color-warning-soft: var(--warning-soft);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
-  --color-focus: var(--focus);
+  --color-positive: var(--positive);
+  --color-positive-bg: var(--pill-positive-bg);
+  --color-negative: var(--negative);
+  --color-negative-bg: var(--pill-negative-bg);
+  --color-orange: var(--orange);
+  --color-orange-2: var(--orange-2);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-paper: var(--paper);
+  --color-transparent: transparent;
 
-  --font-sans: var(--font-brand-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-brand-display, var(--font-brand-sans)), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-brand-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: var(--font);
 
-  --radius-chip: var(--r-chip);
-  --radius-button: var(--r-button);
-  --radius-input: var(--r-input);
-  --radius-tile: var(--r-tile);
-  --radius-panel: var(--r-panel);
-  --radius-feature: var(--r-feature);
+  --radius-card: var(--radius-card);
+  --radius-panel: var(--radius-panel);
+  --radius-media: var(--radius-media);
 
-  --shadow-card: var(--elev-card);
-  --shadow-pop: var(--elev-pop);
-  --shadow-frame: var(--elev-frame);
-
-  --container-page: var(--page-max);
-  --container-text: 720px;
-  --container-prose: 65ch;
-
-  --ease-out: var(--motion-out);
-  --ease-in-out: var(--motion-in-out);
+  --shadow-float: 0 12px 32px rgb(0 0 0 / 0.5);
 }
 
-/* ── Base ──────────────────────────────────────────────────────────────── */
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+    background: var(--ground);
   }
   body {
     background: var(--ground);
-    color: var(--fg);
-    font-family: var(--font-sans);
-    font-size: var(--body);
-    line-height: var(--body-lh);
-    font-weight: var(--body-weight);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 20px;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
   }
-  h1, h2, h3, h4 {
-    font-weight: var(--display-weight);
-    text-wrap: balance;
-  }
-  p, li, dd {
-    text-wrap: pretty;
-  }
-  ::selection {
-    background: var(--fill-strong);
-    color: var(--fg);
-  }
-  /* Never ship an invisible focus ring. Judges tab through things. */
-  :focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 3px;
-  }
-  [hidden] {
-    display: none !important;
-  }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  ::selection { background: var(--accent); color: var(--ink); }
+  [hidden] { display: none !important; }
 }
 
-/* ── Type roles ────────────────────────────────────────────────────────────
-   Semantic level (h1, h2) and visual size are separate decisions. An h2 can
-   wear t-display-xl; a p can wear t-title. Pick the level for the outline
-   and the role for the look. */
-@utility t-display-xl {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  font-size: var(--display-xl);
-  line-height: var(--display-xl-lh);
-  letter-spacing: var(--display-xl-tracking);
-  text-wrap: balance;
-}
-@utility t-display-l {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  font-size: var(--display-l);
-  line-height: var(--display-l-lh);
-  letter-spacing: var(--display-l-tracking);
-  text-wrap: balance;
-}
-@utility t-display-m {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  font-size: var(--display-m);
-  line-height: var(--display-m-lh);
-  letter-spacing: var(--display-m-tracking);
-  text-wrap: balance;
-}
-@utility t-title {
-  font-weight: var(--title-weight);
-  font-size: var(--title);
-  line-height: var(--title-lh);
-  letter-spacing: var(--title-tracking);
-}
-@utility t-lead {
-  font-size: var(--lead);
-  line-height: var(--lead-lh);
-  color: var(--fg-mute);
-  text-wrap: pretty;
-}
-@utility t-body {
-  font-size: var(--body);
-  line-height: var(--body-lh);
-}
-@utility t-small {
-  font-size: var(--small);
-  line-height: var(--small-lh);
-}
-@utility t-label {
-  font-family: var(--label-family);
-  font-size: var(--label);
-  line-height: var(--label-lh);
-  letter-spacing: var(--label-tracking);
-  font-weight: var(--label-weight);
-  text-transform: var(--label-transform);
-  color: var(--fg-faint);
-}
-@utility t-num {
-  font-weight: var(--num-weight);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
+.num { font-variant-numeric: tabular-nums; }
 
-/* ── Buttons ───────────────────────────────────────────────────────────────
-   One height per size, one radius, five variants. One action button per
-   section; everything else is quiet, ghost or text. */
+/* ── App controls ─────────────────────────────────────────────────────────── */
 @layer components {
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    height: 44px;
-    padding: 0 22px;
-    border-radius: var(--r-button);
+    gap: 8px;
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 999px;
     border: 1px solid transparent;
-    font-family: var(--font-sans);
     font-size: 14px;
-    font-weight: var(--ui-weight);
-    line-height: 1;
-    letter-spacing: -0.005em;
+    font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
-    user-select: none;
-    text-decoration: none;
-    transition:
-      background-color var(--dur-micro) ease,
-      border-color var(--dur-micro) ease,
-      color var(--dur-micro) ease,
-      opacity var(--dur-micro) ease,
-      transform var(--dur-micro) var(--motion-out);
+    transition: transform 120ms var(--ease), background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
   }
-  .btn:active {
-    transform: scale(0.98);
-  }
-  .btn:disabled,
-  .btn[aria-disabled="true"] {
-    opacity: 0.45;
-    cursor: not-allowed;
-    transform: none;
-  }
-  .btn[aria-busy="true"] {
-    position: relative;
-    color: transparent;
-    pointer-events: none;
-    opacity: 1; /* busy is not disabled: keep the button at full strength */
-  }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-lg { height: 48px; padding: 0 24px; font-size: 16px; }
+  .btn-primary { background: var(--primary); color: var(--on-primary); }
+  .btn-primary:hover:not(:disabled) { background: #e6e6e6; }
+  .btn-outline { border-color: var(--control); color: var(--text); background: transparent; }
+  .btn-outline:hover:not(:disabled) { border-color: #6a6a6a; background: var(--active); }
+  .btn-text { color: var(--muted); padding: 0 8px; }
+  .btn-text:hover:not(:disabled) { color: var(--text); }
+  .btn[aria-busy="true"] { position: relative; color: transparent !important; pointer-events: none; }
   .btn[aria-busy="true"]::after {
     content: "";
     position: absolute;
     width: 16px;
     height: 16px;
     border-radius: 999px;
-    border: 2px solid currentColor;
-    border-color: var(--btn-ink, currentColor) transparent var(--btn-ink, currentColor) transparent;
-    animation: btn-spin 0.8s linear infinite;
-  }
-  @keyframes btn-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  .btn-sm {
-    height: 36px;
-    padding: 0 16px;
-    font-size: 13px;
-  }
-  .btn-lg {
-    height: 48px;
-    padding: 0 28px;
-    font-size: 15px;
-  }
-  .btn-icon {
-    width: 44px;
-    padding: 0;
-  }
-  .btn-sm.btn-icon {
-    width: 36px;
-  }
-  .btn-action {
-    --btn-ink: var(--on-action);
-    background: var(--action);
-    color: var(--on-action);
-  }
-  .btn-action:hover:not(:disabled) {
-    background: var(--action-hover);
-  }
-  .btn-quiet {
-    --btn-ink: var(--fg);
-    background: var(--fill);
-    color: var(--fg);
-  }
-  .btn-quiet:hover:not(:disabled) {
-    background: var(--fill-strong);
-  }
-  .btn-ghost {
-    --btn-ink: var(--fg);
-    background: transparent;
-    color: var(--fg);
-    border-color: var(--line-strong);
-  }
-  .btn-ghost:hover:not(:disabled) {
-    border-color: var(--fg);
-  }
-  .btn-text {
-    --btn-ink: var(--fg);
-    background: transparent;
-    color: var(--fg);
-    padding-inline: 12px;
-  }
-  .btn-text:hover:not(:disabled) {
-    background: var(--fill);
-  }
-  .btn-accent {
-    --btn-ink: var(--on-accent-soft);
-    background: var(--accent-soft);
-    color: var(--on-accent-soft);
-  }
-  .btn-accent:hover:not(:disabled) {
-    background: color-mix(in oklab, var(--accent-soft) 80%, var(--accent));
-  }
-  .btn-danger {
-    --btn-ink: #ffffff;
-    background: var(--danger);
-    color: #ffffff;
+    border: 2px solid var(--muted);
+    border-top-color: transparent;
+    animation: spin 0.8s linear infinite;
   }
 
-  /* Inputs: one calm style. */
-  .field-input {
-    height: 48px;
-    width: 100%;
-    border-radius: var(--r-input);
-    border: 1px solid var(--line-strong);
-    background: var(--panel);
-    padding: 0 14px;
-    font: inherit;
-    font-size: 15px;
-    color: var(--fg);
-    transition: border-color var(--dur-micro) ease, box-shadow var(--dur-micro) ease;
-  }
-  .field-input::placeholder {
-    color: var(--fg-faint);
-  }
-  .field-input:focus {
-    outline: none;
-    border-color: var(--fg);
-    box-shadow: 0 0 0 3px var(--fill-strong);
-  }
-  .field-input[aria-invalid="true"] {
-    border-color: var(--danger);
-    box-shadow: 0 0 0 3px var(--danger-soft);
-  }
-
-  /* Text link with an arrow that moves on hover. */
-  .arrow-link {
+  .pill {
     display: inline-flex;
+    flex: none;
     align-items: center;
     gap: 6px;
-    font-size: 14px;
-    font-weight: var(--ui-weight);
-    color: var(--fg);
-    text-decoration: none;
-  }
-  .arrow-link > [data-arrow] {
-    transition: transform var(--dur-micro) var(--motion-out);
-  }
-  .arrow-link:hover > [data-arrow] {
-    transform: translateX(3px);
-  }
-
-  /* Skeleton: the shape of the real content, softly breathing. */
-  .skeleton {
-    border-radius: 6px;
-    background: var(--fill-strong);
-    animation: skeleton-breathe 1.6s ease-in-out infinite;
-  }
-  @keyframes skeleton-breathe {
-    50% {
-      opacity: 0.55;
-    }
-  }
-}
-
-/* ── Atmosphere ────────────────────────────────────────────────────────────
-   A .field is a soft blurred light inside a .panel: the one place a
-   gradient is allowed, mixed only from the --field tokens. One per screen. */
-.panel-atmos {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-}
-.field {
-  position: absolute;
-  inset: -12%;
-  z-index: -1;
-  pointer-events: none;
-  filter: blur(48px);
-  background:
-    radial-gradient(60% 70% at 85% 100%, var(--field-c) 0%, transparent 70%),
-    radial-gradient(50% 60% at 15% 20%, var(--field-a) 0%, transparent 70%),
-    radial-gradient(45% 55% at 60% 75%, var(--field-b) 0%, transparent 70%),
-    linear-gradient(135deg, var(--ground) 0%, var(--surface) 100%);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .field-drift {
-    animation: field-drift 22s ease-in-out infinite alternate;
-  }
-  @keyframes field-drift {
-    to {
-      transform: translate3d(-2.5%, -1.5%, 0) scale(1.06);
-    }
-  }
-}
-
-/* ── Motion: progressive, never a hidden page ───────────────────────────────
-   Content is visible by default. Only when JS is running (html.js, set by
-   the boot script in motion.tsx) does a [data-reveal] start hidden, and
-   html.reveal-all shows everything if the app never hydrates. */
-[data-reveal] {
-  transition:
-    opacity var(--dur-reveal) var(--motion-out),
-    transform var(--dur-reveal) var(--motion-out);
-  transition-delay: var(--reveal-delay, 0ms);
-}
-.js [data-reveal]:not([data-in]) {
-  opacity: 0;
-  transform: translate3d(0, var(--reveal-y), 0);
-}
-.reveal-all [data-reveal] {
-  opacity: 1 !important;
-  transform: none !important;
-}
-
-/* Line art that draws itself: <path class="draw" pathLength={1} /> inside a
-   <LineArt>. Stagger with style={{ "--d": "0.2s" }}. */
-.js [data-armed] .draw {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-}
-.js [data-armed][data-in] .draw {
-  animation: draw 0.9s var(--motion-in-out) var(--d, 0s) forwards;
-}
-@keyframes draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* Marquee: two copies of one list, edges masked, paused offscreen. */
-.marquee {
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-}
-.marquee-track {
-  display: flex;
-  width: max-content;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .marquee-track {
-    animation: marquee var(--marquee-dur, 40s) linear infinite;
-  }
-  .marquee:hover .marquee-track,
-  [data-paused] .marquee-track {
-    animation-play-state: paused;
-  }
-}
-@keyframes marquee {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-  .js [data-reveal]:not([data-in]) {
-    opacity: 1;
-    transform: none;
-  }
-  .js [data-armed] .draw {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* ── Sticker language ──────────────────────────────────────────────────────
-   Same as the Chog art: thick ink outline, flat fill, hard offset shadow.
-   Pressing a sticker pushes it into its shadow. */
-@layer components {
-  .btn {
-    height: 48px;
-    border: 2px solid var(--line-strong);
-    box-shadow: var(--elev-card);
-    font-weight: 800;
-    font-size: 15px;
-  }
-  .btn:active:not(:disabled) {
-    transform: translate(3px, 3px);
-    box-shadow: none;
-  }
-  .btn-ghost,
-  .btn-text {
-    box-shadow: none;
-    border-color: transparent;
-  }
-  .btn-quiet {
-    background: var(--panel);
-  }
-  .btn-accent {
-    --btn-ink: var(--fg);
-    background: var(--accent);
-    color: var(--fg);
-  }
-  .sticker {
-    background: var(--panel);
-    border: 2px solid var(--line-strong);
-    border-radius: var(--r-tile);
-    box-shadow: var(--elev-card);
-  }
-  .sticker-pop {
-    box-shadow: var(--elev-pop);
-  }
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 26px;
-    padding: 0 10px;
-    border: 2px solid var(--line-strong);
-    border-radius: var(--r-chip);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    background: var(--panel);
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
     white-space: nowrap;
+    background: var(--active);
+    color: var(--muted);
   }
+  .pill-accent { background: var(--accent-soft); color: var(--accent); }
+  .pill-positive { background: var(--pill-positive-bg); color: var(--positive); }
+  .pill-negative { background: var(--pill-negative-bg); color: var(--negative); }
+
+  .field {
+    height: 40px;
+    width: 100%;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--control);
+    background: var(--ground);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .field::placeholder { color: var(--faint); }
+  .field:focus { outline: none; border-color: var(--text); }
+
+  /* Loading: flat bars at the real size of what they stand in for. No shimmer. */
+  .skeleton { background: var(--active); border-radius: 6px; }
 }
 
-@keyframes candle-grow {
-  from { transform: scaleY(0); }
-}
-@keyframes pop-in {
-  from { transform: scale(0.6) rotate(-6deg); opacity: 0; }
-}
-@keyframes bubble-in {
-  from { transform: translateY(6px); opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; }
-}
-
+/* ── Motion ───────────────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rise { from { opacity: 0; transform: translateY(20px); } }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.96); } }
+@keyframes candle-grow { from { transform: scaleY(0); } }
 @keyframes typing-dot {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
   30% { transform: translateY(-3px); opacity: 1; }
 }
+@keyframes strip { to { transform: translateX(-50%); } }
+@keyframes shutter {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes settle { from { transform: scale(1.12); } }
+
+/* Section entrances on the page: heading, text, then picture, once, as they enter.
+   Content is visible without script: the hidden state only applies once JS has armed it. */
+.js [data-rise] { opacity: 0; transform: translateY(24px); }
+.js [data-rise].in { opacity: 1; transform: none; transition: opacity 600ms var(--ease), transform 600ms var(--ease); transition-delay: var(--d, 0ms); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+  .js [data-rise] { opacity: 1; transform: none; }
+}
+
+/* The page's range controls: the browser's own track in ink, a square-ish thumb. */
+.stage-range { width: 100%; height: 32px; accent-color: var(--ink); cursor: pointer; }

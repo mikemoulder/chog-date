@@ -3,22 +3,30 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { useMe } from "@/lib/client";
-import { ChogFace } from "./chog";
-import { cx } from "./primitives";
-import { Skeleton } from "./states";
 import type { Me } from "@/lib/types";
+import { ChogFace } from "./chog";
+import { cx, Skeleton } from "./ui";
 
 const TABS = [
   { href: "/swipe", label: "Swipe" },
   { href: "/matches", label: "Matches" },
   { href: "/gossip", label: "Gossip" },
-  { href: "/me", label: "Me" },
+  { href: "/me", label: "Profile" },
 ];
 
-export function Wordmark({ className }: { className?: string }) {
+// The logo: chog ❤️ date.
+export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cx("font-display text-[22px] font-extrabold tracking-[-0.04em]", className)}>
-      chog<span className="mx-0.5 inline-block -translate-y-px rounded-chip border-2 border-line-strong bg-accent px-1.5 text-[16px] leading-[20px]">♥</span>date
+    <span className={cx("inline-flex items-center gap-1 font-semibold tracking-[-0.02em]", className)} aria-label="Chog Date">
+      chog<span aria-hidden className="text-[0.9em]">❤️</span>date
+    </span>
+  );
+}
+
+export function Wordmark() {
+  return (
+    <Link href="/" className="text-[16px]">
+      <Logo />
     </Link>
   );
 }
@@ -39,34 +47,33 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [data, isLoading, path, router]);
 
   return (
-    <div className="min-h-dvh pb-24 md:pb-0">
-      <header className="sticky top-0 z-30 border-b-2 border-line-strong bg-glass backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-page items-center justify-between gap-4 px-[var(--gutter)]">
+    <div className="min-h-dvh pb-20 md:pb-0">
+      <header className="sticky top-0 z-30 border-b border-border bg-ground">
+        <div className="mx-auto flex h-12 max-w-[1152px] items-center justify-between gap-6 px-4 lg:px-0">
           <Wordmark />
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
+          <nav className="hidden items-center gap-6 md:flex" aria-label="Main">
             {TABS.map((t) => (
-              <Link key={t.href} href={t.href} className={cx("rounded-button px-3 py-2 font-mono text-[12px] font-semibold uppercase tracking-wider", path.startsWith(t.href) ? "bg-fg text-ground" : "hover:bg-fill")}>
+              <Link key={t.href} href={t.href} className={cx("text-[14px] font-semibold transition-colors", path.startsWith(t.href) ? "text-text" : "text-faint hover:text-muted")}>
                 {t.label}
               </Link>
             ))}
           </nav>
           {active ? (
-            <Link href="/me" className="flex items-center gap-2" aria-label={`Dating as ${active.name}`}>
-              <span className="hidden text-right sm:block">
-                <span className="t-label block">Dating as</span>
-                <span className="block text-[14px] font-bold leading-tight">{active.name}</span>
+            <Link href="/me" className="flex items-center gap-2.5 text-[14px]" aria-label={`Dating as ${active.name}`}>
+              <span className="hidden text-muted sm:inline">
+                Dating as <span className="font-semibold text-text">{active.name}</span>
               </span>
-              <ChogFace chog={active} size={40} />
+              <ChogFace chog={active} size={30} />
             </Link>
           ) : (
-            <Skeleton className="h-10 w-10 rounded-tile" />
+            <Skeleton className="h-[30px] w-[30px] !rounded-full" />
           )}
         </div>
       </header>
-      <main>{me && (me.activeTokenId || path === "/pick") ? children : <ShellSkeleton />}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t-2 border-line-strong bg-panel md:hidden" aria-label="Main">
+      <main className="mx-auto max-w-[1152px] px-4 lg:px-0">{me && (me.activeTokenId || path === "/pick") ? children : <ShellSkeleton />}</main>
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid h-16 grid-cols-4 border-t border-border bg-ground md:hidden" aria-label="Main">
         {TABS.map((t) => (
-          <Link key={t.href} href={t.href} className={cx("flex h-16 items-center justify-center font-mono text-[11px] font-semibold uppercase tracking-wider", path.startsWith(t.href) ? "bg-fg text-ground" : "")}>
+          <Link key={t.href} href={t.href} className={cx("flex items-center justify-center text-[13px] font-semibold", path.startsWith(t.href) ? "text-text" : "text-faint")}>
             {t.label}
           </Link>
         ))}
@@ -75,21 +82,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Loading: the final layout with flat bars in place of the content, so nothing jumps.
 function ShellSkeleton() {
   return (
-    <div className="mx-auto max-w-[560px] space-y-4 px-[var(--gutter)] py-8" aria-busy>
-      <Skeleton className="h-8 w-1/2" />
-      <Skeleton className="aspect-square w-full rounded-panel" />
+    <div className="pb-10" aria-busy>
+      <div className="pb-6 pt-8">
+        <h1 className="text-[24px] font-semibold leading-[30px] text-faint">Loading</h1>
+        <Skeleton className="mt-2 h-4 w-56" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_384px]">
+        <Skeleton className="h-[520px] w-full !rounded-card" />
+        <Skeleton className="h-72 w-full !rounded-card" />
+      </div>
     </div>
   );
 }
 
-export function PageHead({ title, sub, children }: { title: string; sub?: string; children?: ReactNode }) {
+// An app screen's title row: a noun at 24px, an optional line about the data, actions on the right.
+export function TitleRow({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="mb-6 flex items-end justify-between gap-4">
+    <div className="flex flex-wrap items-end justify-between gap-4 pb-6 pt-8">
       <div>
-        <h1 className="t-display-m">{title}</h1>
-        {sub && <p className="mt-1 text-[15px] text-fg-mute">{sub}</p>}
+        <h1 className="text-[24px] font-semibold leading-[30px] tracking-[-0.01em]">{title}</h1>
+        {sub && <p className="mt-1 text-[14px] text-muted">{sub}</p>}
       </div>
       {children}
     </div>

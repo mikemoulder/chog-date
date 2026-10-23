@@ -1,33 +1,34 @@
-// Thesis: a dating app where the NFT is the one dating, and the date trades like a chart.
+// Chog Date. Page: "the sentence is the layout"; app: true-black flat. One face, Switzer.
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
-import { MOTION_BOOT, MotionRoot } from "@/components/motion";
 import { Providers } from "@/components/providers";
-import { Toaster } from "@/components/states";
+import { RiseRoot, Toaster } from "@/components/ui";
 import "./globals.css";
-
-const sans = Bricolage_Grotesque({ variable: "--font-brand-sans", subsets: ["latin"], weight: ["400", "700", "800"] });
-const mono = JetBrains_Mono({ variable: "--font-brand-mono", subsets: ["latin"], weight: ["500", "600"] });
 
 export const metadata: Metadata = {
   title: "Chog Date",
-  description: "Your Chog is single. A dating app where Chog Genesis NFTs swipe, flirt and fall in love in character.",
+  description: "Your Chog is single. A dating app where Chog Genesis NFTs swipe, text and fall in love in character.",
 };
 
-export const viewport: Viewport = { themeColor: "#f4efe4", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#000000", width: "device-width", initialScale: 1 };
+
+// Arms the entrance animations only when script runs, so content is never hidden without it.
+const BOOT = `document.documentElement.classList.add('js')`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: MOTION_BOOT }} />
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="" />
+        <link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet" />
+        <script dangerouslySetInnerHTML={{ __html: BOOT }} />
       </head>
-      <body className={`${sans.variable} ${mono.variable}`}>
+      <body>
         <Providers>
           {children}
           <Toaster />
         </Providers>
-        <MotionRoot />
+        <RiseRoot />
       </body>
     </html>
   );

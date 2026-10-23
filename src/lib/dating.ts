@@ -8,6 +8,7 @@ import { aiRun, getProfile, getProfiles } from "./profiles";
 import { ownerOf, tokensOf, verifyChogBurn } from "./chain";
 import { DINNER_VENUE, GIFTS, type GiftKind } from "./gifts";
 import { HttpError } from "./http";
+import { noDashes } from "./text";
 import type { CoupleDetail, CoupleSummary, DeckCard, FeedEvent, Message, Mode, Profile, Stage } from "./types";
 
 // The rules of Chog Date. Everything is keyed by token id, never by wallet:
@@ -159,7 +160,7 @@ export async function swipe(me: number, target: number, liked: boolean, { superL
   }
 
   if (!likesBack) {
-    await event(target, "admirer", superLike ? `⭐ ${mine.name} super-liked you (${GIFTS.superlike.price} $CHOG burned).` : `${mine.name} swiped right on you.`, me);
+    await event(target, "admirer", superLike ? `${mine.name} super-liked you (${GIFTS.superlike.price} $CHOG burned).` : `${mine.name} swiped right on you.`, me);
     return { matched: false, swipesLeft };
   }
 
@@ -232,7 +233,7 @@ function summary(c: CoupleRow, me: number, profiles: Map<number, Profile>, last?
     stage: c.stage as Stage,
     chemistry: Math.round(c.chemistry),
     dates: c.dates,
-    lastMessage: last ? { body: last.body, senderTokenId: last.senderToken, at: last.createdAt.toISOString() } : undefined,
+    lastMessage: last ? { body: noDashes(last.body), senderTokenId: last.senderToken, at: last.createdAt.toISOString() } : undefined,
     canDateNow: d.ok,
     nextDateAt: d.next,
   };
@@ -410,12 +411,13 @@ export async function gossip(limit = 20): Promise<(FeedEvent & { tokenId: number
   return rows.map(toFeed);
 }
 
+// Stored text passes the house style on the way out too, so older rows can never show a dash.
 function toFeed(e: typeof schema.events.$inferSelect): FeedEvent {
-  return { id: e.id, kind: e.kind as FeedEvent["kind"], tokenId: e.tokenId, otherTokenId: e.otherToken ?? undefined, text: e.text, createdAt: e.createdAt.toISOString() };
+  return { id: e.id, kind: e.kind as FeedEvent["kind"], tokenId: e.tokenId, otherTokenId: e.otherToken ?? undefined, text: noDashes(e.text), createdAt: e.createdAt.toISOString() };
 }
 
 function toMessage(m: typeof schema.messages.$inferSelect): Message {
-  return { id: m.id, senderTokenId: m.senderToken, body: m.body, author: m.author as Message["author"], chemistryDelta: m.chemistryDelta, createdAt: m.createdAt.toISOString() };
+  return { id: m.id, senderTokenId: m.senderToken, body: noDashes(m.body), author: m.author as Message["author"], chemistryDelta: m.chemistryDelta, createdAt: m.createdAt.toISOString() };
 }
 
 // Co-pilot: three lines in the Chog's own voice for the holder to pick from.
@@ -465,9 +467,9 @@ export async function giveGift(me: number, address: string, kind: GiftKind, txHa
     c = u;
   }
   const dateIndex = c.sessionStartedAt ? c.dates + 1 : Math.max(c.dates, 1);
-  const line = kind === "rose" ? `${gift.icon} sent a rose (${gift.price} $CHOG burned)` : `${gift.icon} booked a candlelit dinner (${gift.price} $CHOG burned)`;
+  const line = kind === "rose" ? `sent a rose (${gift.price} $CHOG burned)` : `booked a candlelit dinner (${gift.price} $CHOG burned)`;
   c = await append(c, dateIndex, me, line, "gift", gift.chemistry);
-  await event(target!, "date", `${gift.icon} ${mine.name} ${kind === "rose" ? "sent you a rose" : "booked you a candlelit dinner"}. ${gift.price} $CHOG burned for love.`, me);
+  await event(target!, "date", `${mine.name} ${kind === "rose" ? "sent you a rose" : "booked you a candlelit dinner"}. ${gift.price} $CHOG burned for love.`, me);
 
   // An AI-run partner reacts in character, if they're mid-date.
   if (c.sessionStartedAt && aiRun(partner)) {

@@ -15,3 +15,14 @@ export function deepNoDashes<T>(value: T): T {
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, deepNoDashes(v)])) as T;
   return value;
 }
+
+const EMOJI = /\s*\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
+export function noEmoji(s: string): string {
+  return s.replace(EMOJI, "").trim();
+}
+export function deepNoEmoji<T>(value: T): T {
+  if (typeof value === "string") return noEmoji(value) as T;
+  if (Array.isArray(value)) return value.map(deepNoEmoji) as T;
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, deepNoEmoji(v)])) as T;
+  return value;
+}
