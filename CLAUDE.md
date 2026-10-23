@@ -12,6 +12,8 @@ Architecture and verified chain facts: `docs/architecture.md`.
   an AI is a person.
 - Every external call goes through its seam (`src/lib/llm.ts` (OpenAI, model chain in `OPENAI_MODELS`), `src/lib/chain.ts`) and
   has a fallback. The app must run with no API key (`LLM_FIXTURES=1`). Never spend live model calls on profiles: personas come from `data/personas.json`.
+- **No em dashes or en dashes** anywhere a person reads: UI copy, docs, model output (filtered by `src/lib/text.ts`).
+- Dates should read like real people texting, not character sheets. Prompt rules live in `dateSystem()` in `src/lib/llm.ts`.
 - Shared types live in `src/lib/types.ts`. Change them deliberately.
 - Secrets server-side only. Nothing secret behind `NEXT_PUBLIC_`.
 - $CHOG gifts are burned, never paid to an address we control, and always verified on-chain before they take effect.

@@ -1,8 +1,8 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { use, useEffect, useRef, useState } from "react";
-import { Bubble } from "@/components/bubble";
+import { use, useEffect, useMemo, useRef, useState } from "react";
+import { Bubble, TypingBubble } from "@/components/bubble";
 import { candlesFrom, ChemistryChart, Ticker } from "@/components/chart";
 import { AiBadge, ChogFace, STAGE_LABEL, STAGE_ORDER, StageChip } from "@/components/chog";
 import { cx } from "@/components/primitives";
@@ -11,7 +11,11 @@ import { ErrorState, Skeleton, toast } from "@/components/states";
 import { api, ApiError, useMe } from "@/lib/client";
 import type { CoupleDetail, Me, Mode } from "@/lib/types";
 
-const DATE_LENGTH = 10;
+const DATE_LENGTH = 14;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// How long a reply "takes to type": long enough to feel like a person, short enough not to drag.
+const typingTime = (text: string) => Math.min(2600, 650 + text.length * 28);
+const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
 export default function DatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -27,15 +31,40 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
   const [mode, setModeState] = useState<Mode>(active.mode === "autopilot" ? "autopilot" : active.mode);
   const [running, setRunning] = useState(false);
   const [pending, setPending] = useState(false);
+  const [outgoing, setOutgoing] = useState<string | null>(null);
   const stop = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
 
   const c = q.data;
-  const msgs = c?.session.messages ?? [];
+  const msgs = useMemo(() => c?.session.messages ?? [], [c]);
+
+  // Staged reveal: history appears at once; new texts from the other side arrive one at a
+  // time, each after a typing pause sized to its length. Your own texts appear instantly.
+  const [shown, setShown] = useState<number | null>(null);
+  const shownRef = useRef(0);
+  const visibleCount = Math.min(shown ?? msgs.length, msgs.length);
+  shownRef.current = visibleCount;
+  const msgCount = useRef(0);
+  msgCount.current = msgs.length;
+  useEffect(() => {
+    if (!c) return;
+    if (shown === null || msgs.length < shown) return setShown(msgs.length); // first load or a new date
+    if (shown >= msgs.length) return;
+    const next = msgs[shown];
+    const instant = next.senderTokenId === c.me.tokenId && next.author !== "ai";
+    const t = setTimeout(() => setShown(shown + 1), instant || next.author === "gift" ? 0 : typingTime(next.body));
+    return () => clearTimeout(t);
+  }, [c, msgs, shown]);
+  const revealing = visibleCount < msgs.length ? msgs[visibleCount] : null;
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
-  }, [msgs.length, running, pending]);
+  }, [visibleCount, running, pending, outgoing]);
+
+  // Resolves once every text that has arrived has been "typed" on screen.
+  async function caughtUp() {
+    while (shownRef.current < msgCount.current) await sleep(120);
+  }
 
   async function changeMode(m: Mode) {
     setModeState(m);
@@ -62,7 +91,9 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
       while (!stop.current) {
         const res = await api<{ done: boolean; stageChanged?: boolean; stage?: string }>(`/api/couples/${id}/auto`, {});
         await q.refetch();
+        await caughtUp();
         afterTurn(res);
+        if (!stop.current) await sleep(700 + Math.random() * 900); // a beat to read it before answering
       }
     } catch (e) {
       if (!(e instanceof ApiError && e.status === 409)) toast.error((e as Error).message);
@@ -75,12 +106,18 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
 
   async function say(text: string) {
     setPending(true);
+    setOutgoing(text.trim());
     try {
       const res = await api<{ done: boolean; stageChanged?: boolean; stage?: string }>(`/api/couples/${id}/say`, { text });
+      // Everything already on screen stays put; our text is real now, their reply gets typed out.
+      setShown(msgCount.current);
       await q.refetch();
+      setOutgoing(null);
+      await caughtUp();
       afterTurn(res);
       return true;
     } catch (e) {
+      setOutgoing(null);
       toast.error((e as Error).message);
       return false;
     } finally {
@@ -91,10 +128,12 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
   if (q.isLoading) return <DateSkeleton />;
   if (q.isError || !c) return <div className="mx-auto max-w-[560px] p-6"><ErrorState onRetry={() => q.refetch()} /></div>;
 
+  const visible = msgs.slice(0, visibleCount);
   const deltas = msgs.map((m) => m.chemistryDelta);
   const start = c.chemistry - deltas.reduce((a, d) => a + d * 0.9, 0);
-  const candles = candlesFrom(start, deltas);
-  const lastDelta = msgs.at(-1)?.chemistryDelta;
+  const candles = candlesFrom(start, visible.map((m) => m.chemistryDelta).filter((d, i, all) => d !== 0 || i === all.length - 1));
+  const shownChem = candles.at(-1)?.close ?? start;
+  const lastDelta = [...visible].reverse().find((m) => m.chemistryDelta !== 0)?.chemistryDelta;
   const inProgress = msgs.length > 0 && !c.session.done;
   const partnerHuman = c.partner.claimed && c.partner.mode !== "autopilot";
   const profileOf = (tokenId: number) => (tokenId === c.me.tokenId ? c.me : c.partner);
@@ -120,37 +159,46 @@ export default function DatePage({ params }: { params: Promise<{ id: string }> }
                   {c.venue && <span className="chip bg-accent-soft">🕯️ Candlelit dinner</span>}
                   <span className="font-mono text-[11px] uppercase tracking-wider text-fg-mute">
                     Date #{c.session.index}
-                    {inProgress && ` · line ${msgs.length}/${DATE_LENGTH}`}
+                    {inProgress && ` · ${msgs.filter((m) => m.author !== "gift").length}/${DATE_LENGTH}`}
                   </span>
                 </div>
               </div>
             </div>
-            <Ticker value={c.chemistry} delta={lastDelta} className="shrink-0" />
+            <Ticker value={shownChem} delta={lastDelta} className="shrink-0" />
           </div>
           <div className="border-t-2 border-line bg-surface px-3 py-2">
             {candles.length ? (
               <ChemistryChart candles={candles} height={64} />
             ) : (
-              <p className="flex h-16 items-center justify-center font-mono text-[11px] uppercase tracking-wider text-fg-faint">Every line prints a candle</p>
+              <p className="flex h-16 items-center justify-center font-mono text-[11px] uppercase tracking-wider text-fg-faint">Every text prints a candle</p>
             )}
           </div>
         </header>
 
         {/* The chat */}
-        <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto bg-ground p-4" aria-live="polite">
+        <div ref={scroller} className="flex-1 overflow-y-auto bg-ground p-4" aria-live="polite">
           {msgs.length === 0 && !c.session.done && (
             <div className="mx-auto max-w-[360px] py-8 text-center">
               <p className="t-title">Date #{c.session.index} hasn&apos;t started</p>
               <p className="mt-2 text-[15px] text-fg-mute">
-                {partnerHuman ? `${c.partner.name}'s human is at the wheel. Say something good.` : `${c.partner.name} is AI-run. It'll answer in character, using its traits.`}
+                {partnerHuman ? `${c.partner.name}'s human is at the wheel. Say something good.` : `${c.partner.name} is AI-run. It texts back in its own voice, shaped by its traits.`}
               </p>
             </div>
           )}
-          {msgs.map((m) => (
-            <Bubble key={m.id} from={profileOf(m.senderTokenId)} mine={m.senderTokenId === c.me.tokenId} body={m.body} delta={m.chemistryDelta} author={m.author} />
-          ))}
-          {(running || pending) && <Typing />}
-          {c.session.done && <Recap c={c} />}
+          {visible.map((m, i) => {
+            const next = visible[i + 1];
+            const last = !next || next.senderTokenId !== m.senderTokenId || next.author === "gift" || (outgoing !== null && i === visible.length - 1);
+            return <Bubble key={m.id} from={profileOf(m.senderTokenId)} mine={m.senderTokenId === c.me.tokenId} body={m.body} delta={m.chemistryDelta} author={m.author} last={last} time={clock(m.createdAt)} />;
+          })}
+          {outgoing && <Bubble from={c.me} mine body={outgoing} pending />}
+          {revealing ? (
+            revealing.author !== "gift" && !(revealing.senderTokenId === c.me.tokenId && revealing.author !== "ai") && <TypingBubble from={profileOf(revealing.senderTokenId)} mine={revealing.senderTokenId === c.me.tokenId} />
+          ) : pending ? (
+            !partnerHuman && <TypingBubble from={c.partner} mine={false} />
+          ) : running ? (
+            <TypingBubble from={visible.at(-1)?.senderTokenId === c.me.tokenId ? c.partner : c.me} mine={visible.at(-1)?.senderTokenId !== c.me.tokenId} />
+          ) : null}
+          {c.session.done && !revealing && <Recap c={c} />}
         </div>
 
         {/* The controls */}
@@ -250,19 +298,6 @@ function Composer(props: { mode: Mode; onMode: (m: Mode) => void; running: boole
           </form>
         </>
       )}
-    </div>
-  );
-}
-
-function Typing() {
-  return (
-    <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-fg-faint">
-      <span className="inline-flex gap-1">
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="h-2 w-2 rounded-chip bg-fg-faint" style={{ animation: `bubble-in 600ms ${i * 150}ms infinite alternate` }} />
-        ))}
-      </span>
-      thinking in character
     </div>
   );
 }
