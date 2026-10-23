@@ -1,11 +1,13 @@
 import "server-only";
-import { and, asc, desc, eq, gt, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, ne, or, sql } from "drizzle-orm";
 import { allChogs, seeded } from "./chogs";
 import { compatibility } from "./compat";
 import { getDb, schema } from "./db";
 import { dateReply, scoreLine, suggestLines, summarizeDate, type DateContext, type Speaker } from "./llm";
 import { aiRun, getProfile, getProfiles } from "./profiles";
-import { HttpError } from "./session";
+import { verifyChogBurn } from "./chain";
+import { DINNER_VENUE, GIFTS, type GiftKind } from "./gifts";
+import { HttpError } from "./http";
 import type { CoupleDetail, CoupleSummary, DeckCard, FeedEvent, Message, Mode, Profile, Stage } from "./types";
 
 // The rules of Chog Date. Everything is keyed by token id, never by wallet:
@@ -83,6 +85,9 @@ export async function deck(me: number, limit = 12): Promise<DeckCard[]> {
   const admirers = new Set(
     (await db.select({ from: schema.swipes.fromToken }).from(schema.swipes).where(and(eq(schema.swipes.toToken, me), eq(schema.swipes.liked, true)))).map((r) => r.from),
   );
+  const superAdmirers = new Set(
+    (await db.select({ from: schema.gifts.fromToken }).from(schema.gifts).where(and(eq(schema.gifts.toToken, me), eq(schema.gifts.kind, "superlike")))).map((r) => r.from),
+  );
   const claimed = new Set(
     (await db.select({ id: schema.chogState.tokenId }).from(schema.chogState).where(sql`${schema.chogState.claimedBy} is not null`)).map((r) => r.id),
   );
@@ -92,30 +97,31 @@ export async function deck(me: number, limit = 12): Promise<DeckCard[]> {
     .filter((c) => !exclude.has(c.tokenId))
     .map((c) => {
       const compat = compatibility(me, c.tokenId);
-      const rank = compat.score + (admirers.has(c.tokenId) ? 60 : 0) + (claimed.has(c.tokenId) ? 20 : 0) + seeded(me, c.tokenId, day) * 45;
+      const rank = compat.score + (superAdmirers.has(c.tokenId) ? 200 : 0) + (admirers.has(c.tokenId) ? 60 : 0) + (claimed.has(c.tokenId) ? 20 : 0) + seeded(me, c.tokenId, day) * 45;
       return { id: c.tokenId, compat, rank };
     })
     .sort((a, b) => b.rank - a.rank)
     .slice(0, limit);
 
   const profiles = await getProfiles(ranked.map((r) => r.id));
-  return ranked.map((r) => ({ ...profiles.get(r.id)!, compatibility: r.compat, likesYou: admirers.has(r.id) }));
+  return ranked.map((r) => ({ ...profiles.get(r.id)!, compatibility: r.compat, likesYou: admirers.has(r.id), superLikesYou: superAdmirers.has(r.id) }));
 }
 
 export type SwipeResult = { matched: boolean; coupleId?: string; decidedBy?: "ai" | "human"; swipesLeft: number };
 
-export async function swipe(me: number, target: number, liked: boolean): Promise<SwipeResult> {
+export async function swipe(me: number, target: number, liked: boolean, { superLike = false } = {}): Promise<SwipeResult> {
   if (me === target) throw new HttpError(400, "You can't date yourself. Yet.");
   const db = await getDb();
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.swipes)
     .where(and(eq(schema.swipes.fromToken, me), gte(schema.swipes.createdAt, startOfDay())));
-  if (n >= SWIPES_PER_DAY) throw new HttpError(429, "Out of swipes for today. Your Chog needs its beauty sleep.");
+  // A super-like is already paid for on-chain by the time it gets here, so it never bounces off the daily limit.
+  if (n >= SWIPES_PER_DAY && !superLike) throw new HttpError(429, "Out of swipes for today. Your Chog needs its beauty sleep.");
 
   await db.insert(schema.swipes).values({ fromToken: me, toToken: target, liked }).onConflictDoUpdate({
     target: [schema.swipes.fromToken, schema.swipes.toToken],
     set: { liked, createdAt: new Date() },
   });
-  const swipesLeft = SWIPES_PER_DAY - n - 1;
+  const swipesLeft = Math.max(0, SWIPES_PER_DAY - n - 1);
   if (!liked) return { matched: false, swipesLeft };
 
   const [mine, theirs] = [await getProfile(me), await getProfile(target)];
@@ -124,7 +130,12 @@ export async function swipe(me: number, target: number, liked: boolean): Promise
   let decidedBy: "ai" | "human" | undefined;
   let likesBack = back?.liked === true;
   if (likesBack) decidedBy = "human";
-  else if (!back && aiRun(theirs)) {
+  else if (superLike && aiRun(theirs)) {
+    // A super-like paid in $CHOG always lands with an AI-run Chog.
+    likesBack = true;
+    await db.insert(schema.swipes).values({ fromToken: target, toToken: me, liked: true }).onConflictDoUpdate({ target: [schema.swipes.fromToken, schema.swipes.toToken], set: { liked: true } });
+    decidedBy = "ai";
+  } else if (!back && aiRun(theirs)) {
     // The AI swipes for Chogs whose holder isn't at the wheel: the odds follow compatibility.
     const { score } = compatibility(me, target);
     likesBack = seeded("swipe", target, me) < Math.min(0.95, Math.max(0.15, (score - 15) / 60));
@@ -133,7 +144,7 @@ export async function swipe(me: number, target: number, liked: boolean): Promise
   }
 
   if (!likesBack) {
-    await event(target, "admirer", `${mine.name} swiped right on you.`, me);
+    await event(target, "admirer", superLike ? `⭐ ${mine.name} super-liked you (${GIFTS.superlike.price} $CHOG burned).` : `${mine.name} swiped right on you.`, me);
     return { matched: false, swipesLeft };
   }
 
@@ -229,6 +240,7 @@ export async function coupleDetail(id: string, me: number): Promise<CoupleDetail
     ...summary(c, me, profiles, msgs.at(-1)),
     session: { index: Math.max(dateIndex, 1), messages: msgs.map(toMessage), done: !c.sessionStartedAt && dateIndex > 0, summary: recap?.text },
     unmask: { me: !!mine, partner: !!theirs, partnerHandle: mine && theirs ? theirs : undefined },
+    venue: c.venue ?? undefined,
   };
 }
 
@@ -253,6 +265,7 @@ async function context(c: CoupleRow, speakerId: number): Promise<{ ctx: DateCont
       chemistry: c.chemistry,
       dateNumber: dateIndex,
       history: msgs.map((m) => ({ from: m.senderToken, body: m.body })),
+      venue: c.venue ?? undefined,
     },
   };
 }
@@ -266,7 +279,7 @@ async function startIfNeeded(c: CoupleRow): Promise<CoupleRow> {
   return u;
 }
 
-async function append(c: CoupleRow, dateIndex: number, sender: number, body: string, author: "human" | "ai", delta: number): Promise<CoupleRow> {
+async function append(c: CoupleRow, dateIndex: number, sender: number, body: string, author: "human" | "ai" | "gift", delta: number): Promise<CoupleRow> {
   const db = await getDb();
   await db.insert(schema.messages).values({ coupleId: c.id, dateIndex, senderToken: sender, body: body.slice(0, 400), author, chemistryDelta: delta });
   const [u] = await db.update(schema.couples).set({ chemistry: Math.max(0, Math.min(100, c.chemistry + delta * 0.9)) })
@@ -320,7 +333,7 @@ async function finishIfDone(c: CoupleRow, me: number) {
   const db = await getDb();
   const dateIndex = c.dates + 1;
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.messages)
-    .where(and(eq(schema.messages.coupleId, c.id), eq(schema.messages.dateIndex, dateIndex)));
+    .where(and(eq(schema.messages.coupleId, c.id), eq(schema.messages.dateIndex, dateIndex), ne(schema.messages.author, "gift")));
   if (n < DATE_LENGTH) return { done: false, stageChanged: false };
 
   const { ctx } = await context(c, me);
@@ -331,7 +344,7 @@ async function finishIfDone(c: CoupleRow, me: number) {
   const order = ["matched", "first_date", "dating", "official", "married"];
   if (stage !== "broken_up" && order.indexOf(stage) < order.indexOf(c.stage)) stage = c.stage as Stage; // no demotion
 
-  await db.update(schema.couples).set({ dates, stage, sessionStartedAt: null, lastDateEndedAt: new Date() }).where(eq(schema.couples.id, c.id));
+  await db.update(schema.couples).set({ dates, stage, sessionStartedAt: null, lastDateEndedAt: new Date(), venue: null }).where(eq(schema.couples.id, c.id));
   const text = `${recap.headline}: ${recap.summary}`;
   await event(c.aToken, "date", text, c.bToken);
   await event(c.bToken, "date", text, c.aToken);
@@ -386,4 +399,63 @@ export async function suggestFor(id: string, me: number): Promise<string[]> {
   const c = await loadCouple(id, me);
   const { ctx } = await context(c, me);
   return suggestLines(ctx);
+}
+
+// ── $CHOG gifts ──────────────────────────────────────────────────────────────
+
+export type GiftResult = { kind: GiftKind; burned: number; swipe?: SwipeResult; chemistry?: number };
+
+// The browser burns $CHOG first, then posts the tx hash. We verify the burn on Monad,
+// spend the tx exactly once (it's the primary key), then apply the gift.
+export async function giveGift(me: number, address: string, kind: GiftKind, txHash: `0x${string}`, to: { coupleId?: string; target?: number }): Promise<GiftResult> {
+  const gift = GIFTS[kind];
+  if (!gift) throw new HttpError(400, "Unknown gift");
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new HttpError(400, "That's not a transaction hash");
+  const db = await getDb();
+
+  let couple: CoupleRow | undefined;
+  let target = to.target;
+  if (kind === "superlike") {
+    if (!target || target === me) throw new HttpError(400, "Super-like who?");
+  } else {
+    if (!to.coupleId) throw new HttpError(400, "Gifts go to a match");
+    couple = await loadCouple(to.coupleId, me);
+    if (couple.stage === "broken_up") throw new HttpError(409, "It's over. Roses won't fix this one.");
+    target = partnerOf(couple, me);
+  }
+
+  const burned = await verifyChogBurn(txHash, address, gift.price);
+  const [row] = await db.insert(schema.gifts)
+    .values({ txHash: txHash.toLowerCase(), kind, fromToken: me, toToken: target!, coupleId: couple?.id, amount: String(gift.price) })
+    .onConflictDoNothing()
+    .returning();
+  if (!row) throw new HttpError(409, "That transaction already paid for a gift.");
+  const whole = Number(burned / BigInt(10) ** BigInt(18));
+
+  if (kind === "superlike") return { kind, burned: whole, swipe: await swipe(me, target!, true, { superLike: true }) };
+
+  let c = couple!;
+  const [mine, partner] = [await getProfile(me), await getProfile(target!)];
+  if (kind === "dinner") {
+    const [u] = await db.update(schema.couples).set({ venue: DINNER_VENUE }).where(eq(schema.couples.id, c.id)).returning();
+    c = u;
+  }
+  const dateIndex = c.sessionStartedAt ? c.dates + 1 : Math.max(c.dates, 1);
+  const line = kind === "rose" ? `${gift.icon} sent a rose (${gift.price} $CHOG burned)` : `${gift.icon} booked a candlelit dinner (${gift.price} $CHOG burned)`;
+  c = await append(c, dateIndex, me, line, "gift", gift.chemistry);
+  await event(target!, "date", `${gift.icon} ${mine.name} ${kind === "rose" ? "sent you a rose" : "booked you a candlelit dinner"}. ${gift.price} $CHOG burned for love.`, me);
+
+  // An AI-run partner reacts in character, if they're mid-date.
+  if (c.sessionStartedAt && aiRun(partner)) {
+    const { ctx } = await context(c, partner.tokenId);
+    const reply = await dateReply(ctx);
+    c = await append(c, dateIndex, partner.tokenId, reply.reply, "ai", reply.chemistryDelta);
+  }
+  return { kind, burned: whole, chemistry: Math.round(c.chemistry) };
+}
+
+export async function burnedForLove(): Promise<number> {
+  const db = await getDb();
+  const [{ total }] = await db.select({ total: sql<number>`coalesce(sum(${schema.gifts.amount}::numeric), 0)::int` }).from(schema.gifts);
+  return total;
 }

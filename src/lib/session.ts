@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { getIronSession, type SessionOptions } from "iron-session";
 import { holds } from "./chain";
+import { HttpError } from "./http";
 
 export type SessionData = {
   address?: string; // lowercase, set after a verified signature
@@ -24,11 +25,7 @@ export async function getSession() {
   return getIronSession<SessionData>(await cookies(), options());
 }
 
-export class HttpError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
+export { HttpError };
 
 export async function requireAddress(): Promise<string> {
   const s = await getSession();

@@ -37,7 +37,7 @@ export type Compatibility = {
   reasons: string[]; // human-readable, shown on the card
 };
 
-export type DeckCard = Profile & { compatibility: Compatibility; likesYou: boolean };
+export type DeckCard = Profile & { compatibility: Compatibility; likesYou: boolean; superLikesYou: boolean };
 
 export const STAGES = ["matched", "first_date", "dating", "official", "married", "broken_up"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -58,7 +58,7 @@ export type Message = {
   id: string;
   senderTokenId: number;
   body: string;
-  author: "human" | "ai";
+  author: "human" | "ai" | "gift";
   chemistryDelta: number;
   createdAt: string;
 };
@@ -72,6 +72,7 @@ export type DateSession = {
 
 export type CoupleDetail = CoupleSummary & {
   session: DateSession;
+  venue?: string;
   unmask: { me: boolean; partner: boolean; partnerHandle?: string };
 };
 

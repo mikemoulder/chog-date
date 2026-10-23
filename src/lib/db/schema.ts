@@ -34,6 +34,7 @@ export const couples = pgTable(
     dates: integer("dates").notNull().default(0),
     sessionStartedAt: timestamp("session_started_at", { withTimezone: true }),
     lastDateEndedAt: timestamp("last_date_ended_at", { withTimezone: true }),
+    venue: text("venue"), // set by a $CHOG candlelit dinner; cleared when that date ends
     unmaskA: text("unmask_a"), // handle the owner of A chose to reveal
     unmaskB: text("unmask_b"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -67,4 +68,20 @@ export const events = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("events_token_idx").on(t.tokenId, t.createdAt)],
+);
+
+// $CHOG gifts, burned to the dead address. The tx hash is the key, so a transfer can only
+// ever pay for one gift.
+export const gifts = pgTable(
+  "gifts",
+  {
+    txHash: text("tx_hash").primaryKey(),
+    kind: text("kind").notNull(), // rose | dinner | superlike
+    fromToken: integer("from_token").notNull(),
+    toToken: integer("to_token").notNull(),
+    coupleId: uuid("couple_id"),
+    amount: text("amount").notNull(), // whole $CHOG, as burned
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("gifts_to_idx").on(t.toToken)],
 );

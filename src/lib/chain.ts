@@ -1,7 +1,9 @@
 import "server-only";
-import { createPublicClient, http, parseAbi, type Address } from "viem";
+import { createPublicClient, http, parseAbi, parseUnits, type Address } from "viem";
 import { monad } from "viem/chains";
 import { snapshotOwner, snapshotTokensOf } from "./chogs";
+import { BURN_ADDRESS, CHOG_DECIMALS, CHOG_TOKEN, sumTransfers } from "./gifts";
+import { HttpError } from "./http";
 
 // The Monad seam. Live reads with a short cache; the indexed snapshot is the fallback
 // so a flaky public RPC degrades to slightly stale ownership instead of a dead app.
@@ -59,4 +61,25 @@ export async function holds(address: string, tokenId: number): Promise<boolean> 
 export async function verifySignature(address: string, message: string, signature: `0x${string}`) {
   // publicClient.verifyMessage also handles smart-contract wallets (ERC-1271).
   return client.verifyMessage({ address: address as Address, message, signature });
+}
+
+// ── $CHOG burns ──────────────────────────────────────────────────────────────
+
+// Proves a gift was paid: a successful transaction whose logs include a $CHOG Transfer
+// from the signed-in wallet to the burn address for at least `minWhole` tokens.
+// Waits a few seconds for the receipt, since the browser posts right after confirmation.
+export async function verifyChogBurn(txHash: `0x${string}`, from: string, minWhole: number): Promise<bigint> {
+  let receipt;
+  for (let i = 0; i < 6 && !receipt; i++) {
+    try {
+      receipt = await client.getTransactionReceipt({ hash: txHash });
+    } catch {
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+  if (!receipt) throw new HttpError(409, "That transaction isn't on Monad yet. Try again in a few seconds.");
+  if (receipt.status !== "success") throw new HttpError(402, "That transaction failed on-chain, so nothing was burned.");
+  const burned = sumTransfers(receipt.logs, { token: CHOG_TOKEN, from, to: BURN_ADDRESS });
+  if (burned < parseUnits(String(minWhole), CHOG_DECIMALS)) throw new HttpError(402, "No matching $CHOG burn from your wallet in that transaction.");
+  return burned;
 }
