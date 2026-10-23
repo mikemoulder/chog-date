@@ -14,6 +14,7 @@ Architecture and verified chain facts: `docs/architecture.md`.
   has a fallback. The app must run with no API key (`LLM_FIXTURES=1`). Never spend live model calls on profiles: personas come from `data/personas.json`.
 - Shared types live in `src/lib/types.ts`. Change them deliberately.
 - Secrets server-side only. Nothing secret behind `NEXT_PUBLIC_`.
+- $CHOG gifts are burned, never paid to an address we control, and always verified on-chain before they take effect.
 - Judged on: Novelty 30, Fun 20, Retention 20, Clarity 15, Execution 15, $CHOG bonus.
 
 ## Commands

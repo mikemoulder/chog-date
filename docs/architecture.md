@@ -55,6 +55,17 @@ in prod) · viem/wagmi for Monad · iron-session cookie for the signed-in wallet
 | `couples` | pair of tokens, stage, chemistry, date count, unmask flags + handles |
 | `messages` | couple, sender token, body, author (human/ai), chemistry delta |
 | `events` | per token feed: admirer, match, date, stage change; drives "While you were gone" |
+| `gifts` | $CHOG burns: tx hash (primary key, so one tx pays once), kind, from/to token, amount |
+
+## $CHOG gifts
+
+Rose (100), candlelit dinner (500) and super-like (200) are paid by burning $CHOG
+(`0x3500…7777`, 18 decimals) to `0x…dEaD` from the signed-in wallet. Nobody holds the
+money. The browser sends the transfer and waits for confirmation; the server then reads
+the receipt from Monad and requires a successful $CHOG `Transfer` from that wallet to the
+burn address for at least the price (`verifyChogBurn` in `src/lib/chain.ts`,
+`sumTransfers` in `src/lib/gifts.ts`). Paid super-likes skip the daily swipe limit, since
+they are already paid for when they arrive.
 
 ## Seams
 
