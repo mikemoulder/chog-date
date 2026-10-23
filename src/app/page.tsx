@@ -141,7 +141,7 @@ export default function Home() {
         <div className="mt-auto">
           <div className="flex flex-wrap justify-between gap-2 pb-3 text-[13px] text-ink-soft">
             <span>Chog artwork: Chog Genesis by ChogLabs, shown for its holders. Not affiliated with ChogLabs.</span>
-            <span>Gifts are burned, never paid to anyone.</span>
+            <span>Gifts pay the other Chog&apos;s holder: 90% to them, 10% to the builder.</span>
           </div>
           <p className="select-none whitespace-nowrap font-semibold tracking-[-0.06em]" style={{ fontSize: "clamp(120px, 28vw, 520px)", lineHeight: 0.8, transform: "translateY(22%)" }} aria-hidden>
             chog date

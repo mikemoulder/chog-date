@@ -70,17 +70,19 @@ export const events = pgTable(
   (t) => [index("events_token_idx").on(t.tokenId, t.createdAt)],
 );
 
-// $CHOG gifts, burned to the dead address. The tx hash is the key, so a transfer can only
-// ever pay for one gift.
+// $CHOG gifts: 90% to the receiving Chog's holder, 10% to the builder, in two transfers.
+// Both tx hashes are unique, so a transfer can only ever pay for one gift.
 export const gifts = pgTable(
   "gifts",
   {
-    txHash: text("tx_hash").primaryKey(),
+    txHash: text("tx_hash").primaryKey(), // the transfer to the holder
+    builderTx: text("builder_tx").unique(), // the transfer to the builder
     kind: text("kind").notNull(), // rose | dinner | superlike
     fromToken: integer("from_token").notNull(),
     toToken: integer("to_token").notNull(),
     coupleId: uuid("couple_id"),
-    amount: text("amount").notNull(), // whole $CHOG, as burned
+    amount: text("amount").notNull(), // whole $CHOG, the full price
+    holder: text("holder"), // the address that received the 90%
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("gifts_to_idx").on(t.toToken)],

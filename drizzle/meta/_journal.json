@@ -15,6 +15,13 @@
       "when": 1792752898525,
       "tag": "0001_chog_gifts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792760670247,
+      "tag": "0002_gift_split",
+      "breakpoints": true
     }
   ]
 }

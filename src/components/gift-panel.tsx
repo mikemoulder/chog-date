@@ -8,7 +8,7 @@ import { useGift } from "./use-gift";
 const GET_CHOG = "https://dexscreener.com/monad/0x350035555e10d9afaf1566aaebfced5ba6c27777";
 const ICON: Partial<Record<GiftKind, () => React.ReactElement>> = { rose: RoseIcon, dinner: CandleIcon };
 
-// Spoil your match in $CHOG. Every gift is burned, so nobody pockets it.
+// Spoil your match in $CHOG: 90% goes to their holder, 10% to the builder.
 export function GiftPanel({ coupleId, partnerName, disabled, onGiven }: { coupleId: string; partnerName: string; disabled?: boolean; onGiven: () => void }) {
   const { give, busy, chog, walletReady } = useGift();
   const { connectAsync, connectors } = useConnect();
@@ -52,7 +52,7 @@ export function GiftPanel({ coupleId, partnerName, disabled, onGiven }: { couple
         </button>
       ) : (
         <p className="mt-2 text-[13px] text-faint">
-          Burned, never paid to anyone.{" "}
+          90% goes to their holder, 10% to the builder.{" "}
           <a className="text-muted underline underline-offset-2 hover:text-text" href={GET_CHOG} target="_blank" rel="noreferrer">
             Get $CHOG
           </a>

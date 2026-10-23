@@ -1,8 +1,8 @@
 import "server-only";
-import { createPublicClient, http, parseAbi, parseUnits, type Address } from "viem";
+import { createPublicClient, http, parseAbi, type Address } from "viem";
 import { monad } from "viem/chains";
 import { snapshotOwner, snapshotTokensOf } from "./chogs";
-import { BURN_ADDRESS, CHOG_DECIMALS, CHOG_TOKEN, sumTransfers } from "./gifts";
+import { CHOG_TOKEN, sumTransfers } from "./gifts";
 import { HttpError } from "./http";
 
 // The Monad seam. Live reads with a short cache; the indexed snapshot is the fallback
@@ -63,23 +63,29 @@ export async function verifySignature(address: string, message: string, signatur
   return client.verifyMessage({ address: address as Address, message, signature });
 }
 
-// ── $CHOG burns ──────────────────────────────────────────────────────────────
+// ── $CHOG gifts ──────────────────────────────────────────────────────────────
 
-// Proves a gift was paid: a successful transaction whose logs include a $CHOG Transfer
-// from the signed-in wallet to the burn address for at least `minWhole` tokens.
-// Waits a few seconds for the receipt, since the browser posts right after confirmation.
-export async function verifyChogBurn(txHash: `0x${string}`, from: string, minWhole: number): Promise<bigint> {
-  let receipt;
-  for (let i = 0; i < 6 && !receipt; i++) {
-    try {
-      receipt = await client.getTransactionReceipt({ hash: txHash });
-    } catch {
-      await new Promise((r) => setTimeout(r, 1500));
+// Proves a gift was paid: successful transactions whose logs move $CHOG from the signed-in
+// wallet to the receiving Chog's holder (90%) and to the builder (10%). Waits a few seconds
+// per receipt, since the browser posts right after confirmation.
+export async function verifyGiftPayment(txHashes: `0x${string}`[], from: string, to: { holder: string; builder: string }, want: { holder: bigint; builder: bigint }) {
+  const logs = [];
+  for (const hash of txHashes) {
+    let receipt;
+    for (let i = 0; i < 6 && !receipt; i++) {
+      try {
+        receipt = await client.getTransactionReceipt({ hash });
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     }
+    if (!receipt) throw new HttpError(409, "That transaction isn't on Monad yet. Try again in a few seconds.");
+    if (receipt.status !== "success") throw new HttpError(402, "One of the transfers failed on-chain.");
+    logs.push(...receipt.logs);
   }
-  if (!receipt) throw new HttpError(409, "That transaction isn't on Monad yet. Try again in a few seconds.");
-  if (receipt.status !== "success") throw new HttpError(402, "That transaction failed on-chain, so nothing was burned.");
-  const burned = sumTransfers(receipt.logs, { token: CHOG_TOKEN, from, to: BURN_ADDRESS });
-  if (burned < parseUnits(String(minWhole), CHOG_DECIMALS)) throw new HttpError(402, "No matching $CHOG burn from your wallet in that transaction.");
-  return burned;
+  const toHolder = sumTransfers(logs, { token: CHOG_TOKEN, from, to: to.holder });
+  const toBuilder = to.holder.toLowerCase() === to.builder.toLowerCase() ? toHolder - want.holder : sumTransfers(logs, { token: CHOG_TOKEN, from, to: to.builder });
+  if (toHolder < want.holder) throw new HttpError(402, "The holder's share didn't arrive in those transactions.");
+  if (toBuilder < want.builder) throw new HttpError(402, "The builder's share didn't arrive in those transactions.");
+  return toHolder + toBuilder;
 }

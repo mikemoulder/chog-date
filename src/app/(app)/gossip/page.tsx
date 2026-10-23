@@ -8,7 +8,7 @@ import type { FeedEvent } from "@/lib/types";
 // The Daily Chog. The question: what happened on dates across the collection?
 export default function GossipPage() {
   const q = useQuery({ queryKey: ["gossip"], queryFn: () => api<FeedEvent[]>("/api/gossip"), refetchInterval: 20_000 });
-  const burned = useQuery({ queryKey: ["burned"], queryFn: () => api<{ burned: number }>("/api/burned"), refetchInterval: 60_000 });
+  const gifted = useQuery({ queryKey: ["gifted"], queryFn: () => api<{ gifted: number }>("/api/gifted"), refetchInterval: 60_000 });
   return (
     <div className="grid gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_384px]">
       <div>
@@ -45,10 +45,10 @@ export default function GossipPage() {
         )}
       </div>
       <aside className="lg:pt-[86px]">
-        <section className="rounded-card bg-surface p-5" aria-labelledby="burned">
-          <h2 id="burned" className="text-[14px] text-muted">$CHOG burned for love</h2>
-          <p className="num mt-1 text-[32px] font-semibold leading-none text-accent">{burned.data ? burned.data.burned.toLocaleString() : "-"}</p>
-          <p className="mt-3 text-[13px] text-faint">Every rose, dinner and super-like is burned to the dead address, so nobody pockets it.</p>
+        <section className="rounded-card bg-surface p-5" aria-labelledby="gifted">
+          <h2 id="gifted" className="text-[14px] text-muted">$CHOG gifted between Chogs</h2>
+          <p className="num mt-1 text-[32px] font-semibold leading-none text-accent">{gifted.data ? gifted.data.gifted.toLocaleString() : "-"}</p>
+          <p className="mt-3 text-[13px] text-faint">Every rose, dinner and super-like pays the other Chog&apos;s holder 90%, and the builder 10%.</p>
         </section>
       </aside>
     </div>

@@ -5,8 +5,8 @@ import { compatibility } from "./compat";
 import { getDb, schema } from "./db";
 import { dateReply, scoreLine, suggestLines, summarizeDate, type DateContext, type Speaker } from "./llm";
 import { aiRun, getProfile, getProfiles } from "./profiles";
-import { ownerOf, tokensOf, verifyChogBurn } from "./chain";
-import { DINNER_VENUE, GIFTS, type GiftKind } from "./gifts";
+import { ownerOf, tokensOf, verifyGiftPayment } from "./chain";
+import { DINNER_VENUE, GIFTS, HOLDER_SHARE_BPS, splitGift, type GiftKind } from "./gifts";
 import { HttpError } from "./http";
 import { noDashes } from "./text";
 import type { CoupleDetail, CoupleSummary, DeckCard, FeedEvent, Message, Mode, Profile, Stage } from "./types";
@@ -160,7 +160,7 @@ export async function swipe(me: number, target: number, liked: boolean, { superL
   }
 
   if (!likesBack) {
-    await event(target, "admirer", superLike ? `${mine.name} super-liked you (${GIFTS.superlike.price} $CHOG burned).` : `${mine.name} swiped right on you.`, me);
+    await event(target, "admirer", superLike ? `${mine.name} super-liked you. ${Math.round((GIFTS.superlike.price * HOLDER_SHARE_BPS) / 10000)} $CHOG went to your wallet.` : `${mine.name} swiped right on you.`, me);
     return { matched: false, swipesLeft };
   }
 
@@ -429,58 +429,87 @@ export async function suggestFor(id: string, me: number): Promise<string[]> {
 
 // ── $CHOG gifts ──────────────────────────────────────────────────────────────
 
-export type GiftResult = { kind: GiftKind; burned: number; swipe?: SwipeResult; chemistry?: number };
+export type GiftResult = { kind: GiftKind; paid: number; swipe?: SwipeResult; chemistry?: number };
+export type GiftQuote = { kind: GiftKind; price: number; holder: string; holderAmount: string; builder: string; builderAmount: string; recipient: string };
 
-// The browser burns $CHOG first, then posts the tx hash. We verify the burn on Monad,
-// spend the tx exactly once (it's the primary key), then apply the gift.
-export async function giveGift(me: number, address: string, kind: GiftKind, txHash: `0x${string}`, to: { coupleId?: string; target?: number }): Promise<GiftResult> {
+function builderAddress(): string {
+  const b = process.env.BUILDER_ADDRESS?.trim().toLowerCase();
+  if (!b || !/^0x[0-9a-f]{40}$/.test(b)) throw new HttpError(503, "Gifts aren't switched on yet.");
+  return b;
+}
+
+// Who a gift is for: the partner in a couple, or the Chog being super-liked.
+async function giftTarget(me: number, kind: GiftKind, to: { coupleId?: string; target?: number }) {
+  if (!GIFTS[kind]) throw new HttpError(400, "Unknown gift");
+  if (kind === "superlike") {
+    if (!to.target || to.target === me) throw new HttpError(400, "Super-like who?");
+    return { target: to.target, couple: undefined as CoupleRow | undefined };
+  }
+  if (!to.coupleId) throw new HttpError(400, "Gifts go to a match");
+  const couple = await loadCouple(to.coupleId, me);
+  if (couple.stage === "broken_up") throw new HttpError(409, "It's over. Roses won't fix this one.");
+  return { target: partnerOf(couple, me), couple };
+}
+
+// Step one, before the wallet opens: where each share goes, right now.
+export async function giftQuote(me: number, address: string, kind: GiftKind, to: { coupleId?: string; target?: number }): Promise<GiftQuote> {
+  const { target } = await giftTarget(me, kind, to);
+  const holder = await ownerOf(target);
+  if (holder === address.toLowerCase()) throw new HttpError(400, "That Chog is in your own wallet.");
+  const split = splitGift(kind);
+  const recipient = (await getProfile(target)).name;
+  return { kind, price: GIFTS[kind].price, holder, holderAmount: split.holder.toString(), builder: builderAddress(), builderAmount: split.builder.toString(), recipient };
+}
+
+// Step two, after both transfers confirm: verify them on Monad against the Chog's current
+// holder and the builder, spend each tx exactly once, then apply the gift.
+export async function giveGift(me: number, address: string, kind: GiftKind, txHashes: `0x${string}`[], to: { coupleId?: string; target?: number }): Promise<GiftResult> {
+  const hashes = [...new Set(txHashes.map((h) => h.toLowerCase() as `0x${string}`))];
+  if (!hashes.length || hashes.length > 2 || hashes.some((h) => !/^0x[0-9a-f]{64}$/.test(h))) throw new HttpError(400, "Those aren't transaction hashes");
   const gift = GIFTS[kind];
-  if (!gift) throw new HttpError(400, "Unknown gift");
-  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new HttpError(400, "That's not a transaction hash");
+  const { target, couple } = await giftTarget(me, kind, to);
+  const holder = await ownerOf(target);
+  if (holder === address.toLowerCase()) throw new HttpError(400, "That Chog is in your own wallet.");
+  const builder = builderAddress();
   const db = await getDb();
 
-  let couple: CoupleRow | undefined;
-  let target = to.target;
-  if (kind === "superlike") {
-    if (!target || target === me) throw new HttpError(400, "Super-like who?");
-  } else {
-    if (!to.coupleId) throw new HttpError(400, "Gifts go to a match");
-    couple = await loadCouple(to.coupleId, me);
-    if (couple.stage === "broken_up") throw new HttpError(409, "It's over. Roses won't fix this one.");
-    target = partnerOf(couple, me);
-  }
+  const used = await db.select({ h: schema.gifts.txHash }).from(schema.gifts)
+    .where(or(inArray(schema.gifts.txHash, hashes), inArray(schema.gifts.builderTx, hashes)));
+  if (used.length) throw new HttpError(409, "That transaction already paid for a gift.");
 
-  const burned = await verifyChogBurn(txHash, address, gift.price);
+  const split = splitGift(kind);
+  const paid = await verifyGiftPayment(hashes, address, { holder, builder }, { holder: split.holder, builder: split.builder });
   const [row] = await db.insert(schema.gifts)
-    .values({ txHash: txHash.toLowerCase(), kind, fromToken: me, toToken: target!, coupleId: couple?.id, amount: String(gift.price) })
+    .values({ txHash: hashes[0], builderTx: hashes[1] ?? null, kind, fromToken: me, toToken: target, coupleId: couple?.id, amount: String(gift.price), holder })
     .onConflictDoNothing()
     .returning();
   if (!row) throw new HttpError(409, "That transaction already paid for a gift.");
-  const whole = Number(burned / BigInt(10) ** BigInt(18));
+  const whole = Number(paid / BigInt(10) ** BigInt(18));
 
-  if (kind === "superlike") return { kind, burned: whole, swipe: await swipe(me, target!, true, { superLike: true }) };
+  if (kind === "superlike") return { kind, paid: whole, swipe: await swipe(me, target, true, { superLike: true }) };
 
   let c = couple!;
-  const [mine, partner] = [await getProfile(me), await getProfile(target!)];
+  const [mine, partner] = [await getProfile(me), await getProfile(target)];
   if (kind === "dinner") {
     const [u] = await db.update(schema.couples).set({ venue: DINNER_VENUE }).where(eq(schema.couples.id, c.id)).returning();
     c = u;
   }
   const dateIndex = c.sessionStartedAt ? c.dates + 1 : Math.max(c.dates, 1);
-  const line = kind === "rose" ? `sent a rose (${gift.price} $CHOG burned)` : `booked a candlelit dinner (${gift.price} $CHOG burned)`;
+  const line = kind === "rose" ? `sent a rose (${gift.price} $CHOG)` : `booked a candlelit dinner (${gift.price} $CHOG)`;
   c = await append(c, dateIndex, me, line, "gift", gift.chemistry);
-  await event(target!, "date", `${mine.name} ${kind === "rose" ? "sent you a rose" : "booked you a candlelit dinner"}. ${gift.price} $CHOG burned for love.`, me);
+  await event(target, "date", `${mine.name} ${kind === "rose" ? "sent you a rose" : "booked you a candlelit dinner"}. ${Math.round((gift.price * HOLDER_SHARE_BPS) / 10000)} $CHOG went to your wallet.`, me);
 
   // An AI-run partner reacts in character, if they're mid-date.
   if (c.sessionStartedAt && aiRun(partner)) {
     const { ctx } = await context(c, partner.tokenId);
     c = await appendTexts(c, dateIndex, partner.tokenId, await dateReply(ctx));
   }
-  return { kind, burned: whole, chemistry: Math.round(c.chemistry) };
+  return { kind, paid: whole, chemistry: Math.round(c.chemistry) };
 }
 
-export async function burnedForLove(): Promise<number> {
+export async function giftedTotal(): Promise<number> {
   const db = await getDb();
   const [{ total }] = await db.select({ total: sql<number>`coalesce(sum(${schema.gifts.amount}::numeric), 0)::int` }).from(schema.gifts);
   return total;
 }
+

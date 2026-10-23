@@ -16,7 +16,7 @@ Architecture and verified chain facts: `docs/architecture.md`.
 - Dates should read like real people texting, not character sheets. Prompt rules live in `dateSystem()` in `src/lib/llm.ts`.
 - Shared types live in `src/lib/types.ts`. Change them deliberately.
 - Secrets server-side only. Nothing secret behind `NEXT_PUBLIC_`.
-- $CHOG gifts are burned, never paid to an address we control, and always verified on-chain before they take effect.
+- $CHOG gifts pay 90% to the receiving Chog's current holder and 10% to the builder (`BUILDER_ADDRESS`), and are always verified on-chain before they take effect.
 - Judged on: Novelty 30, Fun 20, Retention 20, Clarity 15, Execution 15, $CHOG bonus.
 
 ## Commands

@@ -162,7 +162,7 @@ export default function SwipePage() {
                   onClick={superLike}
                   disabled={!!leaving || paying !== null}
                   aria-busy={paying === "superlike"}
-                  title={walletReady ? `${GIFTS.superlike.blurb} Burns ${GIFTS.superlike.price} $CHOG.` : "Connect the wallet you signed in with to super-like"}
+                  title={walletReady ? `${GIFTS.superlike.blurb} ${GIFTS.superlike.price} $CHOG: 90% to their holder, 10% to the builder.` : "Connect the wallet you signed in with to super-like"}
                   aria-label={`Super-like ${card.name} for ${GIFTS.superlike.price} $CHOG`}
                 >
                   <StarIcon /> <span className="num">{GIFTS.superlike.price}</span>
