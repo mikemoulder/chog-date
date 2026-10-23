@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   async rewrites() {
     // public/chogs/<id>.webp wins when present; anything missing is generated on demand.
     return { beforeFiles: [], afterFiles: [], fallback: [{ source: "/chogs/:id", destination: "/api/img/:id" }] };

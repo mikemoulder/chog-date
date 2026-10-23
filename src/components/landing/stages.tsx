@@ -123,7 +123,7 @@ function DateFragment() {
       <div className="space-y-2 p-5">
         {LINES.slice(1).map(([who, body], n) => (
           <div key={n} className={who === A ? "flex justify-end" : "flex"}>
-            <p className={who === A ? "max-w-[80%] rounded-[18px] rounded-br-[6px] bg-paper px-3.5 py-2 text-[14px] text-black" : "max-w-[80%] rounded-[18px] rounded-bl-[6px] bg-raised px-3.5 py-2 text-[14px]"}>{body}</p>
+            <p className={who === A ? "max-w-[80%] rounded-[18px] rounded-br-[6px] bg-paper px-3.5 py-2 text-[14px] text-ink" : "max-w-[80%] rounded-[18px] rounded-bl-[6px] bg-raised px-3.5 py-2 text-[14px]"}>{body}</p>
           </div>
         ))}
       </div>
